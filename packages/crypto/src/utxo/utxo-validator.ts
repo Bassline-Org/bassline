@@ -1,6 +1,6 @@
 import { sha256 } from '@noble/hashes/sha2.js'
 import { bytesToHex } from '@noble/hashes/utils.js'
-import { Output, enc, Spend, UTXO, utxoId, ValidationResult, InvalidTx } from './helpers.js'
+import { enc, Spend, UTXO, coinId, ValidationResult, InvalidTx, Coin } from '../helpers.js'
 import { Send } from '@bassline/core'
 import isValid from './validation.js'
 import { utxoish } from './utxoish.js'
@@ -44,7 +44,7 @@ export function createValidator(sendResults?: Send<ValidationResult>) {
       isValid.spender(spend, spending)
       isValid.balances(spend, spending)
       const minting = spend.outputs.map((out, i) => {
-        const id = utxoId(spend.signature, out, i)
+        const id = coinId(spend.signature, out, i)
         return { id, value: out.value, pubKeyHash: out.pubKeyHash } satisfies UTXO
       })
       return { status: 'ok', spending, minting, spend } as const
@@ -63,7 +63,7 @@ export function createValidator(sendResults?: Send<ValidationResult>) {
     sendResults?.(result)
   }
 
-  const coinbase = (outputs: Output[]): UTXO[] => {
+  const coinbase = (outputs: Coin[]): UTXO[] => {
     const entropy = bytesToHex(sha256(enc.encode(crypto.randomUUID())))
     const minted: UTXO[] = []
     for (let i = 0; i < outputs.length; i++) {

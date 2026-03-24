@@ -1,5 +1,5 @@
 import { createValidator } from './utxo-validator.js'
-import { wallet } from './helpers.js'
+import { wallet } from '../helpers.js'
 
 const log = (label: string, ...args: unknown[]) => console.log(`[${label}]`, ...args)
 
@@ -22,52 +22,52 @@ log('balances', balances())
 
 log('spend', 'Alice → 30 to Bob, 20 change')
 alice.sendTx({
-  inputs: [seeded[0].id],
+  inputs: [seeded[0]],
   outputs: [
-    { value: 30, pubKeyHash: alice.address },
-    { value: 20, pubKeyHash: bob.address },
+    { value: 20, pubKeyHash: alice.address },
+    { value: 30, pubKeyHash: bob.address },
   ],
 })
 
-await new Promise(r => setTimeout(r, 0))
+await new Promise(r => setTimeout(r, 10))
 log('balances', balances())
 
 log('spend', 'Bob → 15 to Carol, 15 change')
 bob.sendTx({
-  inputs: [bob.forOwner()[0].id],
+  inputs: [bob.forOwner()[0]],
   outputs: [
     { value: 15, pubKeyHash: carol.address },
     { value: 15, pubKeyHash: bob.address },
   ],
 })
 
-await new Promise(r => setTimeout(r, 0))
+await new Promise(r => setTimeout(r, 10))
 log('balances', balances())
 
 log('spend', 'Alice tries to double-spend her first UTXO')
 alice.sendTx({
-  inputs: [seeded[0].id],
+  inputs: [seeded[0]],
   outputs: [{ value: 50, pubKeyHash: bob.address }],
 })
 
-await new Promise(r => setTimeout(r, 0))
+await new Promise(r => setTimeout(r, 10))
 
 log('spend', 'Alice tries to spend 50 but only output 10')
 const aliceNow = alice.forOwner()
 alice.sendTx({
-  inputs: [aliceNow[0].id],
+  inputs: [aliceNow[0]],
   outputs: [{ value: 10, pubKeyHash: bob.address }],
 })
 
-await new Promise(r => setTimeout(r, 0))
+await new Promise(r => setTimeout(r, 10))
 
 log('spend', "Bob tries to spend Alice's UTXO")
 bob.sendTx({
-  inputs: [aliceNow[0].id],
+  inputs: [aliceNow[0]],
   outputs: [{ value: aliceNow[0].value, pubKeyHash: bob.address }],
 })
 
-await new Promise(r => setTimeout(r, 0))
+await new Promise(r => setTimeout(r, 10))
 
 log('final', `UTXO set size: ${chain.store.size}`)
 log('final', balances())

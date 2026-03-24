@@ -1,18 +1,17 @@
 import { hexToBytes } from '@noble/hashes/utils.js'
-import { Spend, UTXO, pubKeyHash, hashSpend, verify, invalid } from './helpers.js'
+import { Spend, UTXO, pubKeyHash, hashSpend, verify, invalid } from '../helpers.js'
 
 export const isValid = {
   inputs(spend: Spend, store: Map<UTXO['id'], UTXO>) {
     const seen = new Set()
     const spending: UTXO[] = []
-    for (const id of spend.inputs) {
+    for (const s of spend.inputs) {
+      const { id } = s
       if (seen.has(id)) throw invalid('duplicate input id!')
       else seen.add(id)
 
-      const utxo = store.get(id)
-
-      if (!utxo) throw invalid(`input: ${id} not found`)
-      else spending.push(utxo!)
+      if (!store.has(id)) throw invalid(`input: ${id} not found`)
+      else spending.push(s)
     }
     return spending
   },

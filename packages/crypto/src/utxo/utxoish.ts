@@ -1,7 +1,5 @@
-import { port, consume } from '@bassline/core'
-
-/**
- * @module
+/*
+ *
  * If we look at utxo abstractly, we can see that it describes something like:
  *
  * fn validate(witness) -> (commitment(witness) | rejection(witness))
@@ -16,10 +14,7 @@ import { port, consume } from '@bassline/core'
  *
  */
 
-type Utxoish<W, K> = {
-  validate: (witness: W) => K | Promise<K>
-  finalize: (result: K) => void | Promise<void>
-}
+import { port, consume } from '@bassline/core'
 
 export function utxoish<Msg, Result>({ validate, finalize }: Utxoish<Msg, Result>) {
   const validator = port<Msg>()
@@ -36,4 +31,9 @@ export function utxoish<Msg, Result>({ validate, finalize }: Utxoish<Msg, Result
     close: validator.close,
     task,
   } as const
+}
+
+type Utxoish<W, K> = {
+  validate: (witness: W) => K | Promise<K>
+  finalize: (result: K) => void | Promise<void>
 }

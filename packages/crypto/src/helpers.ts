@@ -10,13 +10,13 @@ export const generateKeyPair = () => {
   const pubKey = secp256k1.getPublicKey(privKey)
   return { privKey, pubKey } as const
 }
-
 export const pubKeyHash = (pubKey: Uint8Array) => bytesToHex(sha256(pubKey))
 
-export const hashSpend = (inputs: string[], outputs: Output[]) =>
-  sha256(enc.encode(JSON.stringify({ inputs, outputs })))
+export const hashSpend = (inputs: UTXO[], outputs: Coin[]) => {
+  return sha256(enc.encode(JSON.stringify({ inputs, outputs })))
+}
 
-export const utxoId = (signature: string, output: Output, index: number) =>
+export const coinId = (signature: string, output: Coin, index: number) =>
   bytesToHex(sha256(enc.encode(signature + JSON.stringify(output) + index)))
 
 export const sign = (hash: Uint8Array, privKey: Uint8Array) => bytesToHex(secp256k1.sign(hash, privKey))
@@ -24,7 +24,7 @@ export const sign = (hash: Uint8Array, privKey: Uint8Array) => bytesToHex(secp25
 export const verify = (sig: string, hash: Uint8Array, pubKey: string) =>
   secp256k1.verify(hexToBytes(sig), hash, hexToBytes(pubKey))
 
-export const createSpend = (privKey: Uint8Array, pubKey: Uint8Array, inputs: string[], outputs: Output[]) => {
+export const createSpend = (privKey: Uint8Array, pubKey: Uint8Array, inputs: UTXO[], outputs: Coin[]) => {
   const hash = hashSpend(inputs, outputs)
   return {
     inputs,
@@ -46,7 +46,7 @@ export function wallet(store: Map<string, UTXO>, sendTx?: Send<Spend>, kp = gene
       return store.size
     },
     all: () => [...store.values()],
-    sendTx: (spend: Omit<Spend, 'signature' | 'pubKey'>, target = sendTx) => {
+    sendTx: (spend: Unsigned<Spend>, target = sendTx) => {
       const signed = createSpend(kp.privKey, kp.pubKey, spend.inputs, spend.outputs)
       if (target) {
         target(signed)
@@ -61,28 +61,24 @@ export function wallet(store: Map<string, UTXO>, sendTx?: Send<Spend>, kp = gene
 export class InvalidTx extends Error {}
 export const invalid = (msg: string) => new InvalidTx(msg)
 
-export type KeyPair = ReturnType<typeof generateKeyPair>
-
-export type UTXO = {
-  id: string
+export type KeyPair = {
+  privkey: Uint8Array<ArrayBufferLike>
+  pubkey: Uint8Array<ArrayBufferLike>
+}
+export type Coin = {
   value: number
   pubKeyHash: string
 }
-
-export type Output = {
-  value: number
-  pubKeyHash: string
+export type UTXO = Coin & { id: string }
+export type Unsigned<T> = Omit<T, 'signature' | 'pubKey'>
+export type Signed = { signature: string; pubKey: string }
+export type Spend = Signed & {
+  inputs: UTXO[]
+  outputs: Coin[]
 }
-
-export type Unsigned<T> = Omit<T, 'signature'>
-export type Spend = {
-  inputs: string[]
-  outputs: Output[]
-  signature: string
-  pubKey: string
-}
-
 export type ValidationResult =
   | { status: 'ok'; spending: UTXO[]; minting: UTXO[]; spend: Spend }
   | { status: 'err'; error: string; spend: Spend }
-export type ApplyResult = { minted: UTXO[]; spend: Spend } | { err: string; spend: Spend }
+export type ApplyResult = Accepted | Err
+type Accepted = { spent: UTXO[]; minted: UTXO[]; spend: Spend }
+type Err = { err: string; spend: Spend }
