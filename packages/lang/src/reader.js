@@ -126,6 +126,18 @@ function readExpr(src, pos) {
   if (pos >= src.length) return null
 
   const ch = src[pos]
+  if (ch === "'") {
+    const r = readExpr(src, pos + 1)
+    return { val: { list: [sym('quote'), r.val] }, pos: r.pos }
+  }
+  if (ch === '#' && pos + 1 < src.length && src[pos + 1] === "'") {
+    const r = readExpr(src, pos + 2)
+    return { val: { list: [sym('var'), r.val] }, pos: r.pos }
+  }
+  if (ch === '@') {
+    const r = readExpr(src, pos + 1)
+    return { val: { list: [sym('deref'), r.val] }, pos: r.pos }
+  }
   if (ch === '(') return readList(src, pos)
   if (ch === '[') return readVector(src, pos)
   if (ch === '{') return readMap(src, pos)
