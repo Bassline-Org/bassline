@@ -3,8 +3,10 @@ import { run, defaultEnv } from './index.js'
 import { readFileSync } from 'node:fs'
 import { createInterface } from 'node:readline/promises'
 
-const env = { ...defaultEnv }
-env.load = path => run(readFileSync(path, 'utf-8'), env)
+const env = {
+  ...defaultEnv,
+  load: path => run(readFileSync(path, 'utf-8'), env),
+}
 
 const args = process.argv.slice(2)
 

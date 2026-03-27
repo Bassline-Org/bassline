@@ -3,12 +3,20 @@ const DIGIT = /\d/
 const SYM_START = /[a-zA-Z_+*/=<>!?.]/
 const SYM_CHAR = /[a-zA-Z0-9_+*/=<>!?.-]/
 
-export function sym(name) {
-  return { sym: name }
-}
 export function isSym(x) {
-  return x !== null && typeof x === 'object' && 'sym' in x
+  return x?.tt === 'symbol'
 }
+
+const tt =
+  type =>
+  (val, pos, x = {}) => ({ val, pos, tt: type, ...x })
+const string = tt('string')
+const number = tt('number')
+const symbol = tt('symbol')
+const keyword = tt('keyword')
+const list = tt('list')
+const map = tt('map')
+const vector = tt('vector')
 
 export class ReaderError extends Error {}
 
@@ -40,7 +48,7 @@ function readString(src, pos) {
     }
     pos++
   }
-  return { val, pos: pos + 1 } // skip closing "
+  return string(val, pos + 1) // skip closing "
 }
 
 function readNumber(src, pos) {
@@ -61,7 +69,7 @@ function readNumber(src, pos) {
       pos++
     }
   }
-  return { val: Number(s), pos }
+  return number(Number(s), pos)
 }
 
 function readSymbol(src, pos) {
@@ -70,10 +78,10 @@ function readSymbol(src, pos) {
     name += src[pos]
     pos++
   }
-  if (name === 'nil') return { val: null, pos }
-  if (name === 'true') return { val: true, pos }
-  if (name === 'false') return { val: false, pos }
-  return { val: sym(name), pos }
+  if (name === 'nil') return symbol(null, pos, { literal: true })
+  if (name === 'true') return symbol(true, pos, { literal: true })
+  if (name === 'false') return symbol(false, pos, { literal: true })
+  return symbol(name, pos)
 }
 
 function readKeyword(src, pos) {
@@ -83,7 +91,7 @@ function readKeyword(src, pos) {
     name += src[pos]
     pos++
   }
-  return { val: name, pos }
+  return keyword(name, pos)
 }
 
 function readSequence(src, pos, close) {
@@ -91,34 +99,27 @@ function readSequence(src, pos, close) {
   const items = []
   while (true) {
     pos = skip(src, pos)
-    if (pos >= src.length) throw new Error(`expected '${close}'`)
-    if (src[pos] === close) return { items, pos: pos + 1 }
+    if (pos >= src.length) throw new ReaderError(`expected '${close}'`)
+    if (src[pos] === close) return [items, pos + 1]
     const r = readExpr(src, pos)
-    items.push(r.val)
+    items.push(r)
     pos = r.pos
   }
 }
 
 function readList(src, pos) {
-  const { items, pos: end } = readSequence(src, pos, ')')
-  return { val: { list: items }, pos: end }
+  const [items, end] = readSequence(src, pos, ')')
+  return list(items, end)
 }
 
 function readVector(src, pos) {
-  const { items, pos: end } = readSequence(src, pos, ']')
-  return { val: items, pos: end }
+  const [items, end] = readSequence(src, pos, ']')
+  return vector(items, end)
 }
 
 function readMap(src, pos) {
-  const { items, pos: end } = readSequence(src, pos, '}')
-  const obj = {}
-  for (let i = 0; i < items.length; i += 2) {
-    const key = items[i]
-    const val = items[i + 1]
-    if (typeof key !== 'string') throw new ReaderError(`map key must be a keyword, got: ${JSON.stringify(key)}`)
-    obj[key] = val
-  }
-  return { val: obj, pos: end }
+  const [items, end] = readSequence(src, pos, '}')
+  return map(items, end)
 }
 
 function readExpr(src, pos) {
@@ -128,15 +129,11 @@ function readExpr(src, pos) {
   const ch = src[pos]
   if (ch === "'") {
     const r = readExpr(src, pos + 1)
-    return { val: { list: [sym('quote'), r.val] }, pos: r.pos }
+    return list([symbol('quote', pos), r], r.pos)
   }
   if (ch === '#' && pos + 1 < src.length && src[pos + 1] === "'") {
     const r = readExpr(src, pos + 2)
-    return { val: { list: [sym('var'), r.val] }, pos: r.pos }
-  }
-  if (ch === '@') {
-    const r = readExpr(src, pos + 1)
-    return { val: { list: [sym('deref'), r.val] }, pos: r.pos }
+    return list([symbol('var', pos), r], r.pos)
   }
   if (ch === '(') return readList(src, pos)
   if (ch === '[') return readVector(src, pos)
@@ -151,8 +148,7 @@ function readExpr(src, pos) {
 }
 
 export function read(src) {
-  const r = readExpr(src, 0)
-  return r ? r.val : null
+  return readExpr(src, 0) ?? null
 }
 
 export function readAll(src) {
@@ -162,8 +158,8 @@ export function readAll(src) {
     pos = skip(src, pos)
     if (pos >= src.length) break
     const r = readExpr(src, pos)
-    if (!r) break
-    exprs.push(r.val)
+    if (r == null) break
+    exprs.push(r)
     pos = r.pos
   }
   return exprs
