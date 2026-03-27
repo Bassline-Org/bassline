@@ -2,19 +2,11 @@ import { isSym } from './reader.js'
 
 export class EvalError extends Error {}
 
-const isFalsy = v => v === null || v === false
+const isTruthy = v => v != null && v !== false
 
-export function createEnv(parent = null) {
-  return Object.create(parent)
-}
-
-export function mkVar(val, meta = {}) {
-  return { _var: true, val, meta }
-}
-
-export function isVar(x) {
-  return x?._var === true
-}
+export const createEnv = (parent = null) => Object.create(parent)
+export const mkVar = (val, meta = {}) => ({ _var: true, val, meta })
+export const isVar = x => x?.var === true
 
 function resolve(env, name) {
   const entry = env[name]
@@ -130,7 +122,7 @@ export const specialForms = {
 
   fn: special((args, env, eval_) => {
     const [params, ...body] = args
-    if (!params.tt === 'vector') throw new EvalError('fn params must be a vector')
+    if (params.tt !== 'vector') throw new EvalError('fn params must be a vector')
     const paramNames = params.val.map(p => {
       if (!isSym(p)) throw new EvalError('fn param must be a symbol')
       return p.val
@@ -144,7 +136,7 @@ export const specialForms = {
 
   if: special((args, env, eval_) => {
     const [cond, then, else_] = args
-    if (eval_(cond, env)) {
+    if (isTruthy(eval_(cond, env))) {
       return eval_(then, env)
     } else {
       return eval_(else_, env)
@@ -167,11 +159,10 @@ export const specialForms = {
     return fn
   }),
 
-  quote: special(args => args[0]),
+  quote: special(args => args),
 
   var: special((args, env) => {
     const [name] = args
-    console.log(name)
     if (!isSym(name)) throw new EvalError('var requires a symbol')
     const entry = env[name.val]
     if (entry === undefined) throw new EvalError(`unbound var: ${name.val} `)
@@ -182,7 +173,8 @@ export const specialForms = {
     let result = true
     for (const arg of args) {
       result = eval_(arg, env)
-      if (isFalsy(result)) return result
+      if (isTruthy(result)) continue
+      else return result
     }
     return result
   }),
@@ -191,14 +183,14 @@ export const specialForms = {
     let result = null
     for (const arg of args) {
       result = eval_(arg, env)
-      if (!isFalsy(result)) return result
+      if (isTruthy(result)) return result
     }
     return result
   }),
 
   cond: special((args, env, eval_) => {
     for (let i = 0; i < args.length - 1; i += 2) {
-      if (!isFalsy(eval_(args[i], env))) return eval_(args[i + 1], env)
+      if (isTruthy(eval_(args[i], env))) return eval_(args[i + 1], env)
     }
     if (args.length % 2 === 1) return eval_(args[args.length - 1], env)
     return null
