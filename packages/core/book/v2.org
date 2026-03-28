@@ -755,6 +755,7 @@ export const isPromise = obj => obj instanceof Promise
 export const isNumber = v => typeof v === 'number'
 export const isString = v => typeof v === 'string'
 export const isFunction = v => typeof v === 'function'
+export const isSymbol = v => typeof v === 'symbol'
 export const isNull = v => v === null
 export const isPlainObject = obj => {
   if (obj == null) return false

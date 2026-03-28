@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { message, update, isEmpty, Fault, fault } from '../src/messages.js'
+import { message, update, subst, isEmpty, Fault, fault } from '../src/messages.js'
 
 describe('message', () => {
   it('normalizes undefined to empty object', () => {
@@ -91,6 +91,61 @@ describe('isEmpty', () => {
 
   it('true for message()', () => {
     expect(isEmpty(message())).toBe(true)
+  })
+})
+
+describe('subst', () => {
+  it('rewrites string leaves from let bindings into in', () => {
+    const msg = {
+      let: {
+        foo: { a: 1 },
+        bar: { b: 2 },
+      },
+      in: {
+        left: 'foo',
+        right: ['bar', 'foo'],
+      },
+    }
+
+    expect(subst(msg)).toEqual({
+      left: { a: 1 },
+      right: [{ b: 2 }, { a: 1 }],
+    })
+  })
+
+  it('leaves unknown strings unchanged', () => {
+    expect(subst({ let: { foo: { a: 1 } }, in: { left: 'foo', right: 'baz' } })).toEqual({
+      left: { a: 1 },
+      right: 'baz',
+    })
+  })
+
+  it('does a single non-recursive substitution pass', () => {
+    const msg = {
+      let: {
+        foo: { body: 'bar' },
+        bar: { body: 42 },
+      },
+      in: {
+        value: 'foo',
+      },
+    }
+
+    expect(subst(msg)).toEqual({
+      value: { body: 'bar' },
+    })
+  })
+
+  it('does not require bindings to know about each other', () => {
+    const msg = {
+      let: {
+        foo: 'bar',
+        bar: { answer: 42 },
+      },
+      in: { values: ['foo', 'bar'] },
+    }
+
+    expect(subst(msg)).toEqual({ values: ['bar', { answer: 42 }] })
   })
 })
 

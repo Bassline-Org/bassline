@@ -1,6 +1,6 @@
 import Graph, { DirectedGraph } from 'graphology'
-import { net, port, consume, delay as _delay } from '@bassline/core'
-import type { Send, Recv, Close } from '@bassline/core'
+import { net, port, consume, delay as _delay, offer, accept } from '@bassline/core'
+import type { Send, Recv, Close, Message, Port } from '@bassline/core'
 
 /**
  * An implementation of something that looks like TeaTime as used by croquet
@@ -43,139 +43,53 @@ async function delay(ms = 2000, force = false) {
   if (force || shouldDelay) await _delay(ms)
 }
 
-function createReflector<Msg = unknown>(debug?: Send<{ stamped: TeaMsg<Msg>; ts: number }>) {
-  const mrReflectorId = crypto.randomUUID()
+const STAMP = Symbol.for('stamp')
+
+function ordering({ send, recv, close }: Port) {
+  const id = crypto.randomUUID()
   let lastId = 'ROOT'
-  const clients = net<TeaMsg<Msg>>()
 
-  // the primary stamping & reflecting actor
-  type ToStamp = { msg: Msg; source: string }
-  const stamper = port<ToStamp>(1000)
-  consume(stamper.recv, msg => {
-    const stamped = stamp(msg)
-    const holup = rand(2000)
-    stamped.tt.delay = holup
-    debug?.({ stamped, ts: Date.now() })
-
-    delay(holup).then(() => {
-      clients.send(stamped)
-    })
-  })
-
-  function stamp({ msg, source }: ToStamp) {
-    const prev = lastId
-    const curr = crypto.randomUUID()
-    lastId = curr
-    return {
-      tt: { prev, curr, reflector: mrReflectorId, source, delay: -Infinity },
-      msg,
-    } satisfies TeaMsg<Msg>
-  }
-
-  function join() {
-    // arbitrary buffer sizes, could be whatever
-    const toStamper = port<Msg>(50)
-    const toClient = clients(50)
-    const clientId = crypto.randomUUID()
-    consume(toStamper.recv, msg => stamper.send({ msg, source: clientId }))
-    return {
-      send: toStamper.send,
-      recv: toClient.recv,
-      close: () => {
-        toClient.close()
-        toStamper.close()
+  consume(
+    recv,
+    accept({
+      [STAMP]: (res, msg) => {
+        console.log('stamping', msg)
+        const prev = lastId
+        const curr = crypto.randomUUID()
+        lastId = curr
+        const tt = {
+          prev,
+          curr,
+          reflector: id,
+        }
+        res({ tt })
+        send({ tt, msg })
       },
-    }
-  }
-  join.close = clients.close
-  return join
+    })
+  )
+
+  return close
 }
 
-function createMember<T>({ send, recv, close }: { send: Send<T>; recv: Recv<TeaMsg<T>>; close: Close }) {
-  const graph = new Graph.DirectedGraph()
-
-  consume(recv, ({ tt, msg }) => {
-    const { prev, curr } = tt
-    const arrivalIndex = graph.order
-    graph.mergeNode(prev)
-    graph.mergeNode(curr, { tt, msg, arrivalIndex })
-    graph.mergeDirectedEdge(prev, curr)
+function peer({ send, recv, close }: Port) {
+  consume(recv, msg => {
+    console.log('saw: ', msg)
   })
 
   return {
-    send,
+    send: offer(send, {
+      [STAMP]: msg => console.log('received stamped: ', msg),
+    }),
     close,
-    graph,
   }
 }
 
-//================ Fin Implementation ================
+const n = net()
 
-const iota = (n: number, jump = 1) => {
-  const arr = []
-  for (let i = 0; i < n; i += jump) arr.push(i)
-  return arr
-}
+const closeReflector = ordering(n())
+const a = peer(n())
+const b = peer(n())
 
-const join = createReflector()
+a.send({ hello: 'world' })
 
-const members = iota(100).map(i => createMember(join()))
-
-iota(1000).map(() => {
-  const member = members.at(rand(members.length))!
-  delay(rand(2000)).then(() => {
-    member.send({ someValue: rand(500) })
-  })
-})
-
-await delay(8000, true)
-
-function analyzeSequence({ graph }: { graph: DirectedGraph }) {
-  const roots = graph.filterNodes(node => graph.inDegree(node) === 0)
-  const tails = graph.filterNodes(node => graph.outDegree(node) === 0)
-
-  const sources = graph.reduceNodes((acc, node) => {
-    const { source } = graph.getNodeAttribute(node, 'tt') ?? {}
-    source && acc.add(source)
-    return acc
-  }, new Set())
-
-  const maxDelay = graph.reduceNodes((max, node) => {
-    const tt = graph.getNodeAttribute(node, 'tt') ?? {}
-    const d = tt.delay ?? -Infinity
-    return d > max ? d : max
-  }, -Infinity)
-  const minDelay = graph.reduceNodes((max, node) => {
-    const tt = graph.getNodeAttribute(node, 'tt') ?? {}
-    const d = tt.delay ?? Infinity
-    return d < max ? d : max
-  }, Infinity)
-
-  return {
-    nodes: graph.order,
-    edges: graph.size,
-    roots: roots.length,
-    tails: tails.length,
-    sources,
-    maxDelay,
-    minDelay,
-  }
-}
-
-iota(5).forEach(() => {
-  const member = members[rand(members.length)]
-  console.log(analyzeSequence(member))
-})
-
-join.close()
-
-export type TeaMsg<Msg> = {
-  tt: {
-    prev: string | 'ROOT'
-    curr: string
-    reflector: string
-    source: string
-    delay: number
-  }
-  msg: Msg
-}
+b.send({ goodbye: 'world' })

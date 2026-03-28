@@ -8,6 +8,18 @@
     ".": {
       "types": "./dist/utxo.d.ts",
       "default": "./dist/utxo.js"
+    },
+    "./clave": {
+      "types": "./dist/clave/clave.d.ts",
+      "default": "./dist/clave/clave.js"
+    },
+    "./encrypt": {
+      "types": "./dist/encrypt.d.ts",
+      "default": "./dist/encrypt.js"
+    },
+    "./helpers": {
+      "types": "./dist/helpers.d.ts",
+      "default": "./dist/helpers.js"
     }
   },
   "scripts": {

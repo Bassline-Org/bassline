@@ -15,10 +15,8 @@ export const generateKeyPair = () => {
 
 type Hashable = Uint8Array | string
 export const hash = (data: Hashable) => {
-  let bytes
-  if (isString(data)) return (bytes = sha256(enc.encode(data)))
-  else bytes = sha256(data)
-  return bytesToHex(bytes)
+  const bytes = isString(data) ? enc.encode(data) : data
+  return bytesToHex(sha256(bytes))
 }
 
 export const hashSpend = (inputs: UTXO[], outputs: Coin[]) => {
