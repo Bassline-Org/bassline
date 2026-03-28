@@ -1,4 +1,4 @@
-import { isPlainObject, isString, hasKeys } from './utils.js'
+import { isPlainObject, isString, isSymbol, isFunction, hasKeys } from './utils.js'
 
 export const isEmpty = msg => Object.keys(msg).length === 0
 export const message = content => {
@@ -74,13 +74,13 @@ function rewrite(bindings, value) {
   }
 }
 
-export const isBound = (name, msg) => msg[name] && typeof msg[name] === 'function'
+export const hasCap = (msg, name) => msg[name] && isFunction(msg[name])
 
 function assertHandlers(handlers) {
   const syms = Object.getOwnPropertySymbols(handlers)
   for (const sym of syms) {
-    if (typeof sym !== 'symbol') throw new Error('invalid handler key, must be a symbol!')
-    if (typeof handlers[sym] !== 'function') throw new Error('invalid handler,  must be a function')
+    if (!isSymbol(sym)) throw new Error('invalid handler key, must be a symbol!')
+    if (!isFunction(handlers[sym])) throw new Error('invalid handler,  must be a function')
   }
   return syms
 }
@@ -101,7 +101,7 @@ export function accept(handlers) {
   if (syms.length === 0) throw new Error('[accept] invalid handlers object, no symbols')
   return async msg => {
     for (const sym of syms) {
-      if (isBound(sym, msg)) await handlers[sym](msg[sym], msg)
+      if (hasCap(msg, sym)) await handlers[sym](msg[sym], msg)
     }
   }
 }

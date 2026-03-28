@@ -3,6 +3,7 @@ packages:
   - packages/core
   - packages/ontology
   - packages/crypto
+  - packages/react
 
 onlyBuiltDependencies:
   - esbuild

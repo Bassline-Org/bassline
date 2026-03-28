@@ -1,6 +1,6 @@
 {
   "name": "bassline",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "description": "Getchyo groove on",
   "repository": {
@@ -16,6 +16,7 @@
   "scripts": {
     "build": "pnpm -r build",
     "test": "pnpm -r test",
+    "typecheck": "pnpm -r typecheck",
     "lint": "eslint packages/*/src/**/*.js",
     "lint:fix": "eslint packages/*/src/**/*.js --fix",
     "format": "prettier --write .",

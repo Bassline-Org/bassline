@@ -48,7 +48,7 @@ export function subst(msg: Message<{let: Message, in: Message}>): Message
 
 // --- Capabilities ---
 
-export function isBound<K extends symbol>(name: K, msg: Message): msg is Message & Cap<K>
+export function hasCap<K extends symbol>(msg: Message, name: K): msg is Message & Cap<K>
 
 export type OfferHandlers = Record<symbol, Send>
 export type AcceptHandlers = Record<symbol, (cap: Send, msg: Message) => void | Promise<void>>
