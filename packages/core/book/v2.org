@@ -145,9 +145,10 @@ export async function consume(recv, callback) {
 #+end_src
 
 **** Nets
-Now our ports look like "point-to-point" communication, however in Bassline we don't talk to "something", we observe information from our perspective.
+Current our ports look like "point-to-point" communication, however in Bassline we don't talk to "something", we observe information from our perspective, and send through opaque handles.
 
 This let's us do some neat things when it comes to communication.
+
 For example, a common structure we use is a =net=.
 
 A =net= is a local structure that gives us ports backed by any number of things.
@@ -221,11 +222,30 @@ A message does not come with privileged meaning beyond what participants give it
 If provenance, correlation, naming, coordination hints, or other structure matters, it lives in the message like any other data.
 Bassline does not want a separate metadata plane that is somehow more real than the information being exchanged.
 
+*Note: The following is a bit of new prose for messages i'm testing*
+
+Messages are data, not "code". They are inert unless interpreted and acted upon.
+Interpreting a message is the local act of "binding" the meaning of message to some local program execution.
+
+As such it doesn't violate our model of messaging & communication, if there exists purely local capabilities bound by other local participants, traveling ALONGSIDE the data.
+
+This is equivalent to ports, we don't care who added these capabilities, but we can observe them and act on them locally.
+
+This isn't possible in all systems, but it's a useful pattern none the less.
+
+The constraints to make this "work" are:
+- capabilities must be allowed to be ignored
+- capabilities must never return values directly, they should be opaque
+- capabilities shouldn't removed data from the message itself, they should only enrich it for those interested
+- capabilities cannot travel over the wire, unless they are reified as a higher order message.
+
 *** Concretely
 
 A message is a plain object with string keys. It can be empty, partially filled, or nested inside other messages.
 
 The concrete representation is intentionally minimal. Plain objects are open-ended, nest naturally, and are easy to serialize, enrich, and inspect. That keeps the message lightweight and avoids forcing a closed protocol up front.
+
+***  Simple Messages
 
 =message()= normalizes its input into a message:
 - plain objects pass through
@@ -233,7 +253,7 @@ The concrete representation is intentionally minimal. Plain objects are open-end
 - Anything else is wrapped as ={body: value}=.
 
   #+begin_src js
-import { isPlainObject } from './utils.js'
+import { isPlainObject, isString, hasKeys } from './utils.js'
 
 export const isEmpty = msg => Object.keys(msg).length === 0
 export const message = content => {
@@ -265,8 +285,6 @@ export function update(...args) {
 }
 #+end_src
 
-#+RESULTS:
-
 *** Faults
 
 This indicates that local processing cannot continue, and we must stop.
@@ -287,6 +305,142 @@ export class Fault extends Error {
 }
 
 export const fault = (condition, msg, context) => new Fault(condition, msg, context)
+#+end_src
+
+*** Higher Order Messages
+
+As you are building with Bassline you may find yourself in a situation where you want to add data to a message,
+but that data isn't relevant to the message, but it's related to it.
+
+This is a very strong smell of a leaky ontology, and you should consider what you are trying to express.
+Are you trying to say something about the message? Compare it to another message?
+All of these would call for "higher order messages".
+
+A higher order message is simply a message where the data is other messages.
+/Isn't this just a nested object?!/
+Structurally sure, but not semantically.
+
+A message is a unit of information about something.
+If I am expressing 2d coordinates a fragment like ={x: 123}= isn't enough.
+What I am trying to express is a 2d coordinate, so ={x: 123, y: 456}= is enough for me.
+Anything smaller and i'm lacking essential information for someone to derive meaning.
+
+So "message-ness" isn't a black and white property, it's a matter of what we are trying to express, and whether the message is complete with regards to that.
+
+*Note: None of these are mandates! These are just useful patterns we have discovered while using Bassline!*
+
+*Bonus Note: Higher order messages let us lift any message interpretation as a sharable message*
+
+This lets us do things like partially apply a message, build things like schedulers, compilers, and routers using nothing more than messages.
+In fact let in is effectively a dumb compiler, and composing them gives us something like a nano-pass compiler.
+
+**** Let in
+
+The higher order message, =let:in:= can be used as a binding message. Allowing us to express a single pass rewrite via a message.
+
+=subst= implements this binding convention.
+
+It treats =let= as a local binding scope and =in= as the deferred message body.
+Expansion is intentionally tiny:
+- it only expands when both =let= and =in= are plain objects
+- it rewrites only the =in= branch
+- it replaces string leaves that match names in =let=
+- replacement is a single pass
+
+=lift= does the opposite, given a message, it will extract all keys from a message,
+producing a =let:in:= that reduces to the message.
+
+#+begin_src js
+export function subst(msg) {
+  switch (true) {
+    case !hasKeys(msg, ['let', 'in']):
+      throw fault('expand requires msg to have keys let & in')
+    case !isPlainObject(msg.let):
+    case !isPlainObject(msg.in):
+      throw fault('msg.in & msg.let must be objects')
+    default:
+      return rewrite(msg.let, msg.in)
+  }
+}
+
+export function lift(msg) {
+  const let_ = {}
+  const in_ = { ...msg }
+  for (const f of Object.keys(msg)) {
+      let_[f] = msg[f]
+      in_[f] = f
+  }
+  return { let: let_, in: in_ }
+}
+
+function rewrite(bindings, value) {
+  switch (true) {
+    case isString(value) && value in bindings:
+      return bindings[value]
+    case Array.isArray(value):
+      return value.map(item => rewrite(bindings, item))
+    case isPlainObject(value): {
+      const out = {}
+      for (const [k, v] of Object.entries(value)) out[k] = rewrite(bindings, v)
+      return out
+    }
+    default:
+      return value
+  }
+}
+#+end_src
+
+*** Messages with capabilities
+
+This is a reference implementation of a message with capabilities bound by another participant.
+
+The interesting things to note here are the this allows us to express how a local participant can act on a message, allowing us share a send with a message.
+
+This makes messages not just data, but data enhanced with associated behavior through an interaction surface.
+
+By closing over a function that hides our acceptance criteria, we bind a capability to behaviorally test a receiver without ever assuming that the outside world exists or is stable.
+
+For example, we can build TCP like acknowledgement flows. But what's interesting is that the receiver of the message, cannot know what the final destination / intent of the response will be.
+
+This asymmetry falls naturally out of the model we have, and is an extremely powerful tool for opaquely testing and validating how peers are behaving.
+
+Consider traditional "challenge" protocols. The person being challenged knows that they are being challenged as they are engaging in a shared common protocol.
+
+Whereas if messages carry capabilities, the recipient of a message only sees the capability along with the data, and they never know if the message is a "test", as that's a private perspective only the capability provider knows.
+It also lets them add / remove / replace capabilities as they process and share the messages.
+
+#+begin_src js
+export const isBound = (name, msg) => msg[name] && typeof msg[name] === 'function'
+
+function assertHandlers(handlers) {
+  const syms = Object.getOwnPropertySymbols(handlers)
+  for (const sym of syms) {
+    if (typeof sym !== 'symbol') throw new Error('invalid handler key, must be a symbol!')
+    if (typeof handlers[sym] !== 'function') throw new Error('invalid handler,  must be a function')
+  }
+  return syms
+}
+
+export function offer(dest, handlers) {
+  const syms = assertHandlers(handlers)
+  return msg => {
+    const enriched = { ...msg }
+    for (const sym of syms) {
+      enriched[sym] = m => void handlers[sym](m)
+    }
+    dest(enriched)
+  }
+}
+
+export function accept(handlers) {
+  const syms = assertHandlers(handlers)
+  if (syms.length === 0) throw new Error('[accept] invalid handlers object, no symbols')
+  return async msg => {
+    for (const sym of syms) {
+      if (isBound(sym, msg)) await handlers[sym](msg[sym], msg)
+    }
+  }
+}
 #+end_src
 
 * Transports

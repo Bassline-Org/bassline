@@ -2,6 +2,7 @@ export const EOF: unique symbol
 export function isEOF(v: unknown): v is typeof EOF
 
 export type Message<T = unknown> = Record<string, unknown> & T
+export type Cap<K extends symbol> = { [key in K]: Send }
 
 export type Port<T = Message, K = T> = {
   send: Send<T>
@@ -19,11 +20,11 @@ export type NetJoin<T, K> = {
   send: Send<T>
 }
 
-export function port<T, K = T>(size?: number): Port<T, K>
-export function net<T, K = T>(): NetJoin<T, K>
+export function port<T = Message, K = T>(size?: number): Port<T, K>
+export function net<T = Message, K = T>(): NetJoin<T, K>
 export function clock(ms?: number): Omit<Port<{ts: number}>, 'send'>
 
-export function consume<T>(
+export function consume<T = Message>(
   recv: Recv<T>,
   callback: Send<T>
 ): Promise<void>
@@ -42,6 +43,18 @@ export function update<T, U>(
   msg: T,
   fn: Mapping<T, U>
 ): Message<U>
+
+export function subst(msg: Message<{let: Message, in: Message}>): Message
+
+// --- Capabilities ---
+
+export function isBound<K extends symbol>(name: K, msg: Message): msg is Message & Cap<K>
+
+export type OfferHandlers = Record<symbol, Send>
+export type AcceptHandlers = Record<symbol, (cap: Send, msg: Message) => void | Promise<void>>
+
+export function offer(dest: Send, handlers: OfferHandlers): Send
+export function accept(handlers: AcceptHandlers): Send
 
 export function isEmpty(msg: Message): msg is {}
 export class Fault extends Error {
