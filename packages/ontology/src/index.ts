@@ -47,4 +47,5 @@ export function dispatch<T>(
   })
 }
 
+export * from './caps.js'
 export * from './property-graph/index.js'
