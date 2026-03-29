@@ -4,17 +4,18 @@ import {
   ReactFlowProvider,
   Background,
   Controls,
+  useReactFlow,
   useNodesState,
   useEdgesState,
-  useReactFlow,
   type OnConnect,
   type OnNodeDrag,
   type OnNodesDelete,
   type OnEdgesDelete,
+  type Connection,
   BackgroundVariant,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { useFetcher, useSubmit } from 'react-router'
+import { useFetcher, useSubmit, useNavigate } from 'react-router'
 import SpineNode from './SpineNode'
 import LineEdge from './LineEdge'
 import type { ReactFlowEdge, ReactFlowNode } from '~/db/queries'
@@ -23,49 +24,66 @@ const nodeTypes = { spine: SpineNode }
 const edgeTypes = { line: LineEdge }
 
 type DiagramEditorProps = {
-  initialNodes: ReactFlowNode[]
-  initialEdges: ReactFlowEdge[]
+  nodes: ReactFlowNode[]
+  edges: ReactFlowEdge[]
   diagramId: string
 }
 
-function DiagramEditorInner({ initialNodes, initialEdges, diagramId }: DiagramEditorProps) {
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes)
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
+function DiagramEditorInner({ nodes: loaderNodes, edges: loaderEdges, diagramId }: DiagramEditorProps) {
+  const [nodes, setNodes, onNodesChange] = useNodesState(loaderNodes)
+  const [edges, setEdges, onEdgesChange] = useEdgesState(loaderEdges)
+
   const fetcher = useFetcher()
   const positionSubmit = useSubmit()
   const { screenToFlowPosition } = useReactFlow()
+  const navigate = useNavigate()
   const [addMode, setAddMode] = useState(false)
 
-  // Sync from loader when it revalidates
   useEffect(() => {
-    setNodes(initialNodes)
-    setEdges(initialEdges)
-  }, [initialNodes, initialEdges, setNodes, setEdges])
+    setNodes(loaderNodes)
+    setEdges(loaderEdges)
+  }, [loaderNodes, loaderEdges, setNodes, setEdges])
 
-  const onNodeDragStop: OnNodeDrag = useCallback(
-    (_event, node) => {
-      positionSubmit(
-        {
-          intent: 'update-position',
-          spineId: node.id,
-          x: String(node.position.x),
-          y: String(node.position.y),
-        },
-        { method: 'post', navigate: false }
+  // Prevent duplicate edges between the same handles
+  const isValidConnection = useCallback(
+    (connection: Connection | ReactFlowEdge) => {
+      const sh = connection.sourceHandle
+      const th = connection.targetHandle
+      if (!sh || !th) return false
+      if (connection.source === connection.target) return false
+      return !edges.some(
+        e => (e.sourceHandle === sh && e.targetHandle === th) || (e.sourceHandle === th && e.targetHandle === sh)
       )
+    },
+    [edges]
+  )
+
+  // Persist ALL dragged nodes (handles multi-select drag)
+  const onNodeDragStop: OnNodeDrag = useCallback(
+    (_event, _node, draggedNodes) => {
+      for (const n of draggedNodes) {
+        positionSubmit(
+          {
+            intent: 'update-position',
+            spineId: n.id,
+            x: String(n.position.x),
+            y: String(n.position.y),
+          },
+          { method: 'post', navigate: false }
+        )
+      }
     },
     [positionSubmit]
   )
 
   const onConnect: OnConnect = useCallback(
     connection => {
+      if (!connection.sourceHandle || !connection.targetHandle) return
       fetcher.submit(
         {
           intent: 'connect',
-          sourceSpine: connection.source!,
-          sourceHandle: (connection.sourceHandle ?? 'source:default').replace(/^source:/, ''),
-          targetSpine: connection.target!,
-          targetHandle: (connection.targetHandle ?? 'target:default').replace(/^target:/, ''),
+          sourceHandleId: connection.sourceHandle,
+          targetHandleId: connection.targetHandle,
         },
         { method: 'post' }
       )
@@ -87,6 +105,20 @@ function DiagramEditorInner({ initialNodes, initialEdges, diagramId }: DiagramEd
       fetcher.submit({ intent: 'delete-lines', lineIds: JSON.stringify(deleted.map(e => e.id)) }, { method: 'post' })
     },
     [fetcher]
+  )
+
+  const onNodeClick = useCallback(
+    (_event: React.MouseEvent, node: { id: string }) => {
+      navigate(`spine/${node.id}`)
+    },
+    [navigate]
+  )
+
+  const onEdgeClick = useCallback(
+    (_event: React.MouseEvent, edge: { id: string }) => {
+      navigate(`line/${edge.id}`)
+    },
+    [navigate]
   )
 
   const onPaneClick = useCallback(
@@ -123,7 +155,10 @@ function DiagramEditorInner({ initialNodes, initialEdges, diagramId }: DiagramEd
         onConnect={onConnect}
         onNodesDelete={onNodesDelete}
         onEdgesDelete={onEdgesDelete}
+        onNodeClick={onNodeClick}
+        onEdgeClick={onEdgeClick}
         onPaneClick={onPaneClick}
+        isValidConnection={isValidConnection}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         defaultEdgeOptions={{ type: 'line' }}

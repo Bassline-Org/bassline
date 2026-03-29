@@ -1,18 +1,21 @@
 import { memo } from 'react'
-import { BaseEdge, getStraightPath, type EdgeProps } from '@xyflow/react'
-import type { ReactFlowEdge } from '~/db/queries'
+import { BaseEdge, getSmoothStepPath, type EdgeProps, type Edge } from '@xyflow/react'
+import type { EdgeData } from '~/db/queries'
 
-function LineEdge(props: EdgeProps<ReactFlowEdge>) {
-  const { sourceX, sourceY, targetX, targetY, data, selected } = props
+function LineEdge(props: EdgeProps<Edge<EdgeData>>) {
+  const { sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, data, selected } = props
   const { label, ontologies } = data ?? {}
 
   const color = ontologies?.[0]?.color ?? '#9ca3af'
 
-  const [edgePath, labelX, labelY] = getStraightPath({
+  const [edgePath, labelX, labelY] = getSmoothStepPath({
     sourceX,
     sourceY,
     targetX,
     targetY,
+    sourcePosition,
+    targetPosition,
+    borderRadius: 8,
   })
 
   return (

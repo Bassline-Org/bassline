@@ -1,18 +1,15 @@
+import { Outlet, useOutlet } from 'react-router'
 import type { Route } from './+types/diagram.$id'
 import {
   materialize,
   getDiagram,
-  listOntologies,
   createSpine,
+  createHandle,
   deleteSpine,
   createLine,
   deleteLine,
   updateSpinePosition,
   updateSpineLabel,
-  setSpineOntology,
-  removeSpineOntology,
-  setLineOntology,
-  removeLineOntology,
 } from '~/db/queries'
 import DiagramEditor from '~/components/diagram/DiagramEditor'
 
@@ -25,9 +22,7 @@ export async function loader({ params }: Route.LoaderArgs) {
   if (!diagram) throw new Response('Not Found', { status: 404 })
 
   const { nodes, edges } = await materialize(params.id!)
-  const ontologies = await listOntologies()
-
-  return { diagram, nodes, edges, ontologies }
+  return { diagram, nodes, edges }
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
@@ -50,13 +45,7 @@ export async function action({ request, params }: Route.ActionArgs) {
       break
     }
     case 'connect': {
-      await createLine(
-        diagramId,
-        form.get('sourceSpine') as string,
-        form.get('sourceHandle') as string,
-        form.get('targetSpine') as string,
-        form.get('targetHandle') as string
-      )
+      await createLine(diagramId, form.get('sourceHandleId') as string, form.get('targetHandleId') as string)
       break
     }
     case 'delete-line': {
@@ -73,25 +62,11 @@ export async function action({ request, params }: Route.ActionArgs) {
       break
     }
     case 'update-label': {
-      await updateSpineLabel(diagramId, form.get('spineId') as string, form.get('label') as string)
+      await updateSpineLabel(diagramId, form.get('spineId') as string, (form.get('label') as string) || null)
       break
     }
-    case 'set-ontology': {
-      const entityType = form.get('entityType') as string
-      if (entityType === 'spine') {
-        await setSpineOntology(form.get('entityId') as string, form.get('ontologyId') as string)
-      } else {
-        await setLineOntology(form.get('entityId') as string, form.get('ontologyId') as string)
-      }
-      break
-    }
-    case 'remove-ontology': {
-      const entityType = form.get('entityType') as string
-      if (entityType === 'spine') {
-        await removeSpineOntology(form.get('entityId') as string, form.get('ontologyId') as string)
-      } else {
-        await removeLineOntology(form.get('entityId') as string, form.get('ontologyId') as string)
-      }
+    case 'create-handle': {
+      await createHandle(form.get('spineId') as string, form.get('name') as string)
       break
     }
   }
@@ -99,19 +74,23 @@ export async function action({ request, params }: Route.ActionArgs) {
   return null
 }
 
-export default function DiagramRoute({ loaderData }: Route.ComponentProps) {
+export default function DiagramLayout({ loaderData }: Route.ComponentProps) {
   const { diagram, nodes, edges } = loaderData
+  const outlet = useOutlet()
 
   return (
     <div className="flex h-screen flex-col">
-      <header className="flex items-center gap-3 border-b border-border px-4 py-2">
+      <header className="flex items-center gap-3 border-b border-border px-4 py-2 shrink-0">
         <a href="/" className="text-sm text-muted-foreground hover:text-foreground">
           &larr; Diagrams
         </a>
         <h1 className="text-sm font-semibold">{diagram.name}</h1>
       </header>
-      <div className="flex-1">
-        <DiagramEditor initialNodes={nodes} initialEdges={edges} diagramId={diagram.id} />
+      <div className="flex flex-1 overflow-hidden">
+        <div className="flex-1 min-w-0">
+          <DiagramEditor nodes={nodes} edges={edges} diagramId={diagram.id} />
+        </div>
+        {outlet && <Outlet />}
       </div>
     </div>
   )

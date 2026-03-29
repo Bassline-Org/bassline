@@ -1,4 +1,15 @@
-import { pgTable, uuid, text, real, boolean, bigserial, timestamp, primaryKey, jsonb } from 'drizzle-orm/pg-core'
+import {
+  pgTable,
+  uuid,
+  text,
+  real,
+  boolean,
+  bigserial,
+  timestamp,
+  primaryKey,
+  jsonb,
+  unique,
+} from 'drizzle-orm/pg-core'
 
 // ============================================
 // STRUCTURE — what exists and what connects
@@ -8,16 +19,26 @@ export const spines = pgTable('spines', {
   id: uuid('id').primaryKey().defaultRandom(),
 })
 
+export const handles = pgTable(
+  'handles',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    spineId: uuid('spine_id')
+      .notNull()
+      .references(() => spines.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+  },
+  t => [unique().on(t.spineId, t.name)]
+)
+
 export const lines = pgTable('lines', {
   id: uuid('id').primaryKey().defaultRandom(),
-  sourceSpine: uuid('source_spine')
+  sourceHandleId: uuid('source_handle_id')
     .notNull()
-    .references(() => spines.id, { onDelete: 'cascade' }),
-  sourceHandle: text('source_handle').notNull(),
-  targetSpine: uuid('target_spine')
+    .references(() => handles.id, { onDelete: 'cascade' }),
+  targetHandleId: uuid('target_handle_id')
     .notNull()
-    .references(() => spines.id, { onDelete: 'cascade' }),
-  targetHandle: text('target_handle').notNull(),
+    .references(() => handles.id, { onDelete: 'cascade' }),
 })
 
 // ============================================

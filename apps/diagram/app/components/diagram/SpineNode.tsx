@@ -1,115 +1,88 @@
 import { memo } from 'react'
-import { Handle, Position, type NodeProps } from '@xyflow/react'
+import { Handle, Position, type NodeProps, type Node } from '@xyflow/react'
+import type { NodeData } from '~/db/queries'
 
-type HandleInfo = { id: string; role: 'source' | 'target' }
+function SpineNode({ data, selected }: NodeProps<Node<NodeData>>) {
+  const { label, ontologies, marks, handles } = data
 
-type SpineData = {
-  label: string | null
-  ontologies: { name: string; color: string | null }[]
-  marks: string[]
-  expanded: boolean
-  handles: HandleInfo[]
-}
-
-const MARK_SYMBOLS: Record<string, string> = {
-  attests: '🔑',
-  persists: '💾',
-  transforms: '⚡',
-  filters: '🔍',
-}
-
-// Distribute handles evenly around the spine
-function layoutHandles(handles: HandleInfo[]) {
-  const sources = handles.filter(h => h.role === 'source')
-  const targets = handles.filter(h => h.role === 'target')
-
-  const positions = [Position.Top, Position.Right, Position.Bottom, Position.Left]
-  const result: { id: string; type: 'source' | 'target'; position: Position }[] = []
-
-  // Targets get first available positions, sources get the rest
-  let posIdx = 0
-  for (const h of targets) {
-    result.push({ id: h.id, type: 'target', position: positions[posIdx % positions.length] })
-    posIdx++
-  }
-  for (const h of sources) {
-    result.push({ id: h.id, type: 'source', position: positions[posIdx % positions.length] })
-    posIdx++
-  }
-
-  return result
-}
-
-function SpineNode({ data, selected }: NodeProps) {
-  const { label, ontologies, marks, handles } = data as unknown as SpineData
-
-  const primaryColor = ontologies?.[0]?.color ?? '#9ca3af'
-  const hasMultiple = ontologies?.length > 1
-
-  const layoutedHandles = layoutHandles(handles ?? [])
-
-  // If no handles from DB, provide one source and one target so new connections work
-  const hasAnyHandle = layoutedHandles.length > 0
+  const primaryColor = ontologies?.[0]?.color ?? null
+  const hasHandles = handles && handles.length > 0
 
   return (
-    <div className="flex flex-col items-center gap-1">
-      {/* Dynamic handles from DB */}
-      {layoutedHandles.map(h => (
-        <Handle
-          key={`${h.type}-${h.id}`}
-          type={h.type}
-          position={h.position}
-          id={h.id}
-          className="w-2! h-2! min-w-0! min-h-0! rounded-full! bg-muted-foreground/40! border-none! hover:bg-primary!"
-        />
-      ))}
-
-      {/* Fallback handles for unconnected spines */}
-      {!hasAnyHandle && (
-        <>
+    <div
+      className="rounded-lg bg-card min-w-[100px] relative"
+      style={{
+        borderTopWidth: 2,
+        borderRightWidth: 2,
+        borderBottomWidth: 2,
+        borderLeftWidth: primaryColor ? 4 : 2,
+        borderStyle: 'solid',
+        borderTopColor: selected ? 'var(--ring)' : 'var(--border)',
+        borderRightColor: selected ? 'var(--ring)' : 'var(--border)',
+        borderBottomColor: selected ? 'var(--ring)' : 'var(--border)',
+        borderLeftColor: primaryColor ?? (selected ? 'var(--ring)' : 'var(--border)'),
+      }}
+    >
+      {/* Handle rows */}
+      {hasHandles ? (
+        <div className="px-3 py-2 flex flex-col gap-1.5">
+          {handles.map((h, i) => {
+            const yPercent = `${((i + 1) / (handles.length + 1)) * 100}%`
+            return (
+              <div key={h.id} className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                <span className="text-muted-foreground/60">&bull;</span>
+                {h.name}
+                <Handle
+                  type="target"
+                  position={Position.Left}
+                  id={h.id}
+                  style={{ top: yPercent }}
+                  className="w-2! h-2! min-w-0! min-h-0! rounded-sm! bg-primary/50! border! border-primary/80! hover:bg-primary! -left-[5px]!"
+                />
+                <Handle
+                  type="source"
+                  position={Position.Right}
+                  id={h.id}
+                  style={{ top: yPercent }}
+                  className="w-2! h-2! min-w-0! min-h-0! rounded-sm! bg-primary/50! border! border-primary/80! hover:bg-primary! -right-[5px]!"
+                />
+              </div>
+            )
+          })}
+        </div>
+      ) : (
+        <div className="px-3 py-2 text-[11px] text-muted-foreground/40 italic">
+          no handles
           <Handle
             type="target"
-            position={Position.Top}
-            id="target:default"
-            className="w-2! h-2! min-w-0! min-h-0! rounded-full! bg-muted-foreground/40! border-none! hover:bg-primary!"
+            position={Position.Left}
+            id="__fallback"
+            className="w-2! h-2! min-w-0! min-h-0! rounded-sm! bg-primary/50! border! border-primary/80! hover:bg-primary! -left-[5px]!"
           />
           <Handle
             type="source"
-            position={Position.Bottom}
-            id="source:default"
-            className="w-2! h-2! min-w-0! min-h-0! rounded-full! bg-muted-foreground/40! border-none! hover:bg-primary!"
+            position={Position.Right}
+            id="__fallback"
+            className="w-2! h-2! min-w-0! min-h-0! rounded-sm! bg-primary/50! border! border-primary/80! hover:bg-primary! -right-[5px]!"
           />
-        </>
-      )}
-
-      {/* The spine dot */}
-      <div
-        className="rounded-full transition-shadow"
-        style={{
-          width: 28,
-          height: 28,
-          backgroundColor: primaryColor,
-          border: selected ? '3px solid var(--ring)' : '2px solid rgba(0,0,0,0.15)',
-          boxShadow: selected ? '0 0 0 2px var(--ring)' : 'none',
-          background: hasMultiple
-            ? `conic-gradient(${ontologies.map((o, i) => `${o.color ?? '#9ca3af'} ${(i / ontologies.length) * 360}deg ${((i + 1) / ontologies.length) * 360}deg`).join(', ')})`
-            : primaryColor,
-        }}
-      />
-
-      {/* Mark icons */}
-      {marks?.length > 0 && (
-        <div className="flex gap-0.5 text-xs">
-          {marks.map(m => (
-            <span key={m} title={m}>
-              {MARK_SYMBOLS[m] ?? '•'}
-            </span>
-          ))}
         </div>
       )}
 
       {/* Label */}
-      {label && <div className="text-xs text-muted-foreground max-w-24 truncate text-center">{label}</div>}
+      {label && (
+        <div className="px-3 pb-2 text-xs font-medium text-foreground border-t border-border/50 pt-1">{label}</div>
+      )}
+
+      {/* Marks */}
+      {marks && marks.length > 0 && (
+        <div className="px-3 pb-1 flex gap-1 text-[10px] text-muted-foreground">
+          {marks.map(m => (
+            <span key={m} title={m} className="bg-muted px-1 rounded">
+              {m}
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

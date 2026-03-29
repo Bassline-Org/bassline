@@ -1,3 +1,7 @@
+-- Prevent duplicate lines between the same two handles (undirected)
+CREATE UNIQUE INDEX IF NOT EXISTS lines_unique_handles
+  ON lines (LEAST(source_handle_id, target_handle_id), GREATEST(source_handle_id, target_handle_id));
+
 -- Edit log trigger function
 -- Automatically captures INSERT/UPDATE/DELETE into the edits table
 CREATE OR REPLACE FUNCTION log_edit() RETURNS TRIGGER AS $$
@@ -27,6 +31,10 @@ $$ LANGUAGE plpgsql;
 -- Attach triggers to all structural tables
 CREATE OR REPLACE TRIGGER spines_edit
   AFTER INSERT OR UPDATE OR DELETE ON spines
+  FOR EACH ROW EXECUTE FUNCTION log_edit();
+
+CREATE OR REPLACE TRIGGER handles_edit
+  AFTER INSERT OR UPDATE OR DELETE ON handles
   FOR EACH ROW EXECUTE FUNCTION log_edit();
 
 CREATE OR REPLACE TRIGGER lines_edit
