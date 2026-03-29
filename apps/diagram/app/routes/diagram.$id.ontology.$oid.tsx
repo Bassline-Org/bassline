@@ -1,10 +1,11 @@
+import { redirect } from 'react-router'
 import type { Route } from './+types/diagram.$id.ontology.$oid'
 import { getOntology, getSpinesWithOntology, getLinesWithOntology } from '~/db/queries'
 import { InspectPanel, InspectSection, ThingLink, InfoRow } from '~/components/inspect/InspectPanel'
 
 export async function loader({ params }: Route.LoaderArgs) {
   const ontology = await getOntology(params.oid!)
-  if (!ontology) throw new Response('Not Found', { status: 404 })
+  if (!ontology) return redirect(`/diagram/${params.id}`)
 
   const [spines, lines] = await Promise.all([getSpinesWithOntology(ontology.id), getLinesWithOntology(ontology.id)])
 

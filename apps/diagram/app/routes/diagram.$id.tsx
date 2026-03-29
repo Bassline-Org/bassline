@@ -13,6 +13,20 @@ import {
 } from '~/db/queries'
 import DiagramEditor from '~/components/diagram/DiagramEditor'
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function shouldRevalidate({
+  formMethod,
+  defaultShouldRevalidate,
+}: {
+  formMethod?: string
+  defaultShouldRevalidate: boolean
+}) {
+  // Only re-run the parent loader after mutations (POST).
+  // Navigation to child inspection routes (GET) should NOT re-run the loader,
+  // because that would create new node/edge references and blow away React Flow state.
+  return !!formMethod
+}
+
 export function meta({ data }: Route.MetaArgs) {
   return [{ title: data?.diagram?.name ?? 'Diagram' }]
 }

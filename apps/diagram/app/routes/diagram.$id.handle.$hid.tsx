@@ -1,10 +1,11 @@
+import { redirect } from 'react-router'
 import type { Route } from './+types/diagram.$id.handle.$hid'
 import { getHandle, getSpine, getLinesForHandle, getEditsForEntity, getDiagramsForSpine } from '~/db/queries'
 import { InspectPanel, InspectSection, ThingLink, InfoRow } from '~/components/inspect/InspectPanel'
 
 export async function loader({ params }: Route.LoaderArgs) {
   const handle = await getHandle(params.hid!)
-  if (!handle) throw new Response('Not Found', { status: 404 })
+  if (!handle) return redirect(`/diagram/${params.id}`)
 
   const [spine, connections, recentEdits] = await Promise.all([
     getSpine(handle.spineId),

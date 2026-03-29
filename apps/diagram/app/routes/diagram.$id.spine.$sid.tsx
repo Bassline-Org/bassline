@@ -1,4 +1,4 @@
-import { useFetcher } from 'react-router'
+import { useFetcher, redirect } from 'react-router'
 import type { Route } from './+types/diagram.$id.spine.$sid'
 import {
   getSpine,
@@ -21,7 +21,7 @@ import { useState } from 'react'
 
 export async function loader({ params }: Route.LoaderArgs) {
   const spine = await getSpine(params.sid!)
-  if (!spine) throw new Response('Not Found', { status: 404 })
+  if (!spine) return redirect(`/diagram/${params.id}`)
 
   const [handles, ontologies, marks, connections, diagrams, recentEdits, allOntologies] = await Promise.all([
     getHandlesForSpine(params.sid!),

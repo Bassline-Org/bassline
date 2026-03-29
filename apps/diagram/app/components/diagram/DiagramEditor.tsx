@@ -39,6 +39,9 @@ function DiagramEditorInner({ nodes: loaderNodes, edges: loaderEdges, diagramId 
   const navigate = useNavigate()
   const [addMode, setAddMode] = useState(false)
 
+  // Sync from loader after mutations. shouldRevalidate on the parent route
+  // ensures this only fires when the loader actually re-ran (POST), not on
+  // child route navigation (GET).
   useEffect(() => {
     setNodes(loaderNodes)
     setEdges(loaderEdges)

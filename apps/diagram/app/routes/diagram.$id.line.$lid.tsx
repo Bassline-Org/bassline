@@ -1,4 +1,4 @@
-import { useFetcher } from 'react-router'
+import { useFetcher, redirect } from 'react-router'
 import type { Route } from './+types/diagram.$id.line.$lid'
 import {
   getLine,
@@ -13,7 +13,7 @@ import { InspectPanel, InspectSection, ThingLink, InfoRow } from '~/components/i
 
 export async function loader({ params }: Route.LoaderArgs) {
   const line = await getLine(params.lid!)
-  if (!line) throw new Response('Not Found', { status: 404 })
+  if (!line) return redirect(`/diagram/${params.id}`)
 
   const [ontologies, recentEdits, allOntologies] = await Promise.all([
     getLineOntologies(line.id),
