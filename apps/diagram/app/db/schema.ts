@@ -9,6 +9,7 @@ import {
   primaryKey,
   jsonb,
   unique,
+  index,
 } from 'drizzle-orm/pg-core'
 
 // ============================================
@@ -17,6 +18,7 @@ import {
 
 export const spines = pgTable('spines', {
   id: uuid('id').primaryKey().defaultRandom(),
+  layerId: uuid('layer_id').references(() => ontologies.id),
 })
 
 export const handles = pgTable(
@@ -51,42 +53,39 @@ export const ontologies = pgTable('ontologies', {
   color: text('color'),
 })
 
-export const spineOntologies = pgTable(
-  'spine_ontologies',
+export const annotations = pgTable(
+  'annotations',
   {
-    spineId: uuid('spine_id')
-      .notNull()
-      .references(() => spines.id, { onDelete: 'cascade' }),
-    ontologyId: uuid('ontology_id')
-      .notNull()
-      .references(() => ontologies.id, { onDelete: 'cascade' }),
+    id: uuid('id').primaryKey().defaultRandom(),
+    entityId: uuid('entity_id').notNull(),
+    entityType: text('entity_type').notNull(),
+    kind: text('kind').notNull(),
+    textValue: text('text_value'),
+    jsonValue: jsonb('json_value'),
+    urlValue: text('url_value'),
+    refId: uuid('ref_id'),
+    refType: text('ref_type'),
+    numberValue: real('number_value'),
+    boolValue: boolean('bool_value'),
   },
-  t => [primaryKey({ columns: [t.spineId, t.ontologyId] })]
+  t => [
+    index('annotations_entity_kind_idx').on(t.entityId, t.kind),
+    index('annotations_kind_idx').on(t.kind),
+    index('annotations_ref_idx').on(t.refId),
+  ]
 )
 
-export const lineOntologies = pgTable(
-  'line_ontologies',
-  {
-    lineId: uuid('line_id')
-      .notNull()
-      .references(() => lines.id, { onDelete: 'cascade' }),
-    ontologyId: uuid('ontology_id')
-      .notNull()
-      .references(() => ontologies.id, { onDelete: 'cascade' }),
-  },
-  t => [primaryKey({ columns: [t.lineId, t.ontologyId] })]
-)
+// ============================================
+// CAPABILITIES — registered programs
+// ============================================
 
-export const spineMarks = pgTable(
-  'spine_marks',
-  {
-    spineId: uuid('spine_id')
-      .notNull()
-      .references(() => spines.id, { onDelete: 'cascade' }),
-    mark: text('mark').notNull(),
-  },
-  t => [primaryKey({ columns: [t.spineId, t.mark] })]
-)
+export const capabilities = pgTable('capabilities', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: text('name').notNull().unique(),
+  url: text('url').notNull(),
+  description: text('description'),
+  triggerOn: text('trigger_on').notNull(),
+})
 
 // ============================================
 // PERSPECTIVE — how things are seen in a diagram
@@ -159,6 +158,34 @@ export const expansions = pgTable('expansions', {
   diagramId: uuid('diagram_id')
     .notNull()
     .references(() => diagrams.id, { onDelete: 'cascade' }),
+})
+
+// ============================================
+// TASKS — ephemeral pending work
+// ============================================
+
+export const tasks = pgTable('tasks', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  capabilityId: uuid('capability_id')
+    .notNull()
+    .references(() => capabilities.id, { onDelete: 'cascade' }),
+  entityId: uuid('entity_id').notNull(),
+  entityType: text('entity_type').notNull(),
+  triggerEditId: bigserial('trigger_edit_id', { mode: 'number' }),
+  context: jsonb('context'),
+})
+
+export const taskFailures = pgTable('task_failures', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  capabilityId: uuid('capability_id')
+    .notNull()
+    .references(() => capabilities.id, { onDelete: 'cascade' }),
+  entityId: uuid('entity_id').notNull(),
+  entityType: text('entity_type').notNull(),
+  triggerEditId: bigserial('trigger_edit_id', { mode: 'number' }),
+  context: jsonb('context'),
+  error: text('error'),
+  failedAt: timestamp('failed_at', { withTimezone: true }).notNull().defaultNow(),
 })
 
 // ============================================

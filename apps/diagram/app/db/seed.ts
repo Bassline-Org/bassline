@@ -5,14 +5,15 @@ import {
   createHandle,
   getHandleByName,
   createLine,
-  setSpineOntology,
-  setLineOntology,
+  setEntityOntology,
+  createCapability,
+  attachCapability,
 } from './queries'
 
 async function seed() {
   console.log('Seeding database...')
 
-  // Ontologies
+  // Ontologies (these are also layers)
   const graph = await createOntology('graph', '#3b82f6')
   const storage = await createOntology('storage', '#22c55e')
   const unknown = await createOntology('unknown', '#9ca3af')
@@ -22,39 +23,52 @@ async function seed() {
   const diagram = await createDiagram('Sample System')
   console.log('Created diagram:', diagram.name)
 
-  // Spines (each gets a 'default' handle automatically)
-  const a = await createSpine(diagram.id, 200, 100, 'client')
-  const b = await createSpine(diagram.id, 500, 100, 'graph-store')
-  const c = await createSpine(diagram.id, 500, 300, 'sqlite')
-  const d = await createSpine(diagram.id, 200, 300, 'watcher')
+  // Spines with layer assignments
+  const a = await createSpine(diagram.id, 200, 100, 'client', unknown.id)
+  const b = await createSpine(diagram.id, 500, 100, 'graph-store', graph.id)
+  const c = await createSpine(diagram.id, 500, 300, 'sqlite', storage.id)
+  const d = await createSpine(diagram.id, 200, 300, 'watcher', graph.id)
   console.log('Created 4 spines')
 
-  // graph-store plays an extra game
+  // Extra handle on graph-store
   const bStorage = await createHandle(b.id, 'storage')
   console.log('Added storage handle to graph-store')
 
-  // Spine ontologies
-  await setSpineOntology(a.id, unknown.id)
-  await setSpineOntology(b.id, graph.id)
-  await setSpineOntology(c.id, storage.id)
-  await setSpineOntology(d.id, graph.id)
+  // Ontology annotations on spines
+  await setEntityOntology(a.id, 'spine', unknown.id)
+  await setEntityOntology(b.id, 'spine', graph.id)
+  await setEntityOntology(c.id, 'spine', storage.id)
+  await setEntityOntology(d.id, 'spine', graph.id)
 
-  // Get default handles for connections
+  // Get default handles
   const aDefault = await getHandleByName(a.id, 'default')
   const bDefault = await getHandleByName(b.id, 'default')
   const cDefault = await getHandleByName(c.id, 'default')
   const dDefault = await getHandleByName(d.id, 'default')
 
-  // Lines between handles
+  // Lines
   const l1 = await createLine(diagram.id, aDefault!.id, bDefault!.id)
   const l2 = await createLine(diagram.id, bStorage.id, cDefault!.id)
   const l3 = await createLine(diagram.id, bDefault!.id, dDefault!.id)
   console.log('Created 3 lines')
 
-  // Line ontologies
-  await setLineOntology(l1.id, graph.id)
-  await setLineOntology(l2.id, storage.id)
-  await setLineOntology(l3.id, graph.id)
+  // Ontology annotations on lines
+  await setEntityOntology(l1.id, 'line', graph.id)
+  await setEntityOntology(l2.id, 'line', storage.id)
+  await setEntityOntology(l3.id, 'line', graph.id)
+
+  // Example capability
+  const validateCap = await createCapability(
+    'validate-connection',
+    '/api/caps/validate-connection',
+    'Checks if connected handles share compatible ontologies',
+    'connect'
+  )
+  console.log('Created capability:', validateCap.name)
+
+  // Attach capability to graph-store's default handle
+  await attachCapability(bDefault!.id, 'handle', validateCap.id)
+  console.log('Attached capability to graph-store:default')
 
   console.log('Seed complete!')
   process.exit(0)

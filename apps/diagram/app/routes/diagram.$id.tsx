@@ -1,4 +1,4 @@
-import { Outlet, useOutlet } from 'react-router'
+import { Link, Outlet, useOutlet } from 'react-router'
 import type { Route } from './+types/diagram.$id'
 import {
   materialize,
@@ -10,6 +10,8 @@ import {
   deleteLine,
   updateSpinePosition,
   updateSpineLabel,
+  notifyChange,
+  getPendingTasks,
 } from '~/db/queries'
 import DiagramEditor from '~/components/diagram/DiagramEditor'
 
@@ -36,7 +38,8 @@ export async function loader({ params }: Route.LoaderArgs) {
   if (!diagram) throw new Response('Not Found', { status: 404 })
 
   const { nodes, edges } = await materialize(params.id!)
-  return { diagram, nodes, edges }
+  const taskCount = (await getPendingTasks()).length
+  return { diagram, nodes, edges, taskCount }
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
@@ -46,28 +49,40 @@ export async function action({ request, params }: Route.ActionArgs) {
 
   switch (intent) {
     case 'add-spine': {
-      await createSpine(diagramId, Number(form.get('x')), Number(form.get('y')))
+      const spine = await createSpine(diagramId, Number(form.get('x')), Number(form.get('y')))
+      await notifyChange('spine', spine.id, 'create')
       break
     }
     case 'delete-spine': {
-      await deleteSpine(form.get('spineId') as string)
+      const spineId = form.get('spineId') as string
+      await notifyChange('spine', spineId, 'delete')
+      await deleteSpine(spineId)
       break
     }
     case 'delete-spines': {
       const ids = JSON.parse(form.get('spineIds') as string) as string[]
+      for (const id of ids) await notifyChange('spine', id, 'delete')
       await Promise.all(ids.map(id => deleteSpine(id)))
       break
     }
     case 'connect': {
-      await createLine(diagramId, form.get('sourceHandleId') as string, form.get('targetHandleId') as string)
+      const line = await createLine(
+        diagramId,
+        form.get('sourceHandleId') as string,
+        form.get('targetHandleId') as string
+      )
+      await notifyChange('line', line.id, 'connect')
       break
     }
     case 'delete-line': {
-      await deleteLine(form.get('lineId') as string)
+      const lineId = form.get('lineId') as string
+      await notifyChange('line', lineId, 'delete')
+      await deleteLine(lineId)
       break
     }
     case 'delete-lines': {
       const ids = JSON.parse(form.get('lineIds') as string) as string[]
+      for (const id of ids) await notifyChange('line', id, 'delete')
       await Promise.all(ids.map(id => deleteLine(id)))
       break
     }
@@ -89,7 +104,7 @@ export async function action({ request, params }: Route.ActionArgs) {
 }
 
 export default function DiagramLayout({ loaderData }: Route.ComponentProps) {
-  const { diagram, nodes, edges } = loaderData
+  const { diagram, nodes, edges, taskCount } = loaderData
   const outlet = useOutlet()
 
   return (
@@ -98,7 +113,16 @@ export default function DiagramLayout({ loaderData }: Route.ComponentProps) {
         <a href="/" className="text-sm text-muted-foreground hover:text-foreground">
           &larr; Diagrams
         </a>
-        <h1 className="text-sm font-semibold">{diagram.name}</h1>
+        <h1 className="text-sm font-semibold flex-1">{diagram.name}</h1>
+        {taskCount > 0 && (
+          <Link
+            to="tasks"
+            className="flex items-center gap-1.5 px-2 py-1 text-xs font-medium rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+          >
+            <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+            {taskCount} task{taskCount !== 1 ? 's' : ''}
+          </Link>
+        )}
       </header>
       <div className="flex flex-1 overflow-hidden">
         <div className="flex-1 min-w-0">

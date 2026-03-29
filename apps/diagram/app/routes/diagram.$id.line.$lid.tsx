@@ -2,12 +2,12 @@ import { useFetcher, redirect } from 'react-router'
 import type { Route } from './+types/diagram.$id.line.$lid'
 import {
   getLine,
-  getLineOntologies,
+  getEntityOntologies,
   getEditsForEntity,
   listOntologies,
   getDiagramsForSpine,
-  setLineOntology,
-  removeLineOntology,
+  setEntityOntology,
+  removeEntityOntology,
 } from '~/db/queries'
 import { InspectPanel, InspectSection, ThingLink, InfoRow } from '~/components/inspect/InspectPanel'
 
@@ -16,12 +16,11 @@ export async function loader({ params }: Route.LoaderArgs) {
   if (!line) return redirect(`/diagram/${params.id}`)
 
   const [ontologies, recentEdits, allOntologies] = await Promise.all([
-    getLineOntologies(line.id),
+    getEntityOntologies(line.id, 'line'),
     getEditsForEntity(line.id, 5),
     listOntologies(),
   ])
 
-  // Get labels for the connected spines
   const [sourceDiagrams, targetDiagrams] = await Promise.all([
     getDiagramsForSpine(line.sourceSpineId),
     getDiagramsForSpine(line.targetSpineId),
@@ -39,10 +38,10 @@ export async function action({ request, params }: Route.ActionArgs) {
 
   switch (intent) {
     case 'assign-ontology':
-      await setLineOntology(lineId, form.get('ontologyId') as string)
+      await setEntityOntology(lineId, 'line', form.get('ontologyId') as string)
       break
     case 'remove-ontology':
-      await removeLineOntology(lineId, form.get('ontologyId') as string)
+      await removeEntityOntology(lineId, 'line', form.get('ontologyId') as string)
       break
   }
 

@@ -1,27 +1,34 @@
 import { redirect } from 'react-router'
 import type { Route } from './+types/diagram.$id.handle.$hid'
-import { getHandle, getSpine, getLinesForHandle, getEditsForEntity, getDiagramsForSpine } from '~/db/queries'
+import {
+  getHandle,
+  getSpine,
+  getLinesForHandle,
+  getCapabilitiesForEntity,
+  getEditsForEntity,
+  getDiagramsForSpine,
+} from '~/db/queries'
 import { InspectPanel, InspectSection, ThingLink, InfoRow } from '~/components/inspect/InspectPanel'
 
 export async function loader({ params }: Route.LoaderArgs) {
   const handle = await getHandle(params.hid!)
   if (!handle) return redirect(`/diagram/${params.id}`)
 
-  const [spine, connections, recentEdits] = await Promise.all([
+  const [spine, connections, caps, recentEdits] = await Promise.all([
     getSpine(handle.spineId),
     getLinesForHandle(handle.id),
+    getCapabilitiesForEntity(handle.id),
     getEditsForEntity(handle.id, 5),
   ])
 
-  // Get the spine's label from the current diagram
   const spineInDiagrams = spine ? await getDiagramsForSpine(spine.id) : []
   const spineLabel = spineInDiagrams.find(d => d.id === params.id)?.label ?? spine?.id.slice(0, 8) ?? 'unknown'
 
-  return { handle, spine, spineLabel, connections, recentEdits }
+  return { handle, spine, spineLabel, connections, caps, recentEdits }
 }
 
 export default function HandleInspect({ loaderData }: Route.ComponentProps) {
-  const { handle, spine, spineLabel, connections, recentEdits } = loaderData
+  const { handle, spine, spineLabel, connections, caps, recentEdits } = loaderData
 
   return (
     <InspectPanel title={handle.name} subtitle="Handle">
@@ -37,6 +44,18 @@ export default function HandleInspect({ loaderData }: Route.ComponentProps) {
           <ThingLink to={`../spine/${spine.id}`} label={spineLabel} icon={<span className="text-xs">□</span>} />
         )}
       </InspectSection>
+
+      {caps.length > 0 && (
+        <InspectSection title="Capabilities" count={caps.length}>
+          {caps.map(c => (
+            <div key={c.annotationId} className="px-3 py-1 text-xs">
+              <span className="font-medium">{c.name}</span>
+              <span className="text-muted-foreground ml-1">({c.triggerOn})</span>
+              {c.description && <p className="text-[10px] text-muted-foreground mt-0.5">{c.description}</p>}
+            </div>
+          ))}
+        </InspectSection>
+      )}
 
       <InspectSection title="Connections" count={connections.length}>
         {connections.map(c => {

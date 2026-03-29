@@ -16,7 +16,7 @@ export default function OntologyInspect({ loaderData }: Route.ComponentProps) {
   const { ontology, spines, lines } = loaderData
 
   return (
-    <InspectPanel title={ontology.name} subtitle="Ontology" color={ontology.color}>
+    <InspectPanel title={ontology.name} subtitle="Ontology / Layer" color={ontology.color}>
       <InspectSection title="Info">
         <InfoRow label="ID">
           <code className="text-[10px] text-muted-foreground">{ontology.id.slice(0, 12)}...</code>

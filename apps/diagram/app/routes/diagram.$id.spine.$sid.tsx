@@ -3,17 +3,21 @@ import type { Route } from './+types/diagram.$id.spine.$sid'
 import {
   getSpine,
   getHandlesForSpine,
-  getSpineOntologies,
-  getSpineMarks,
+  getEntityOntologies,
+  getEntityMarks,
   getLinesForSpine,
   getDiagramsForSpine,
+  getAnnotationsForEntity,
+  getCapabilitiesForEntity,
   getEditsForEntity,
   listOntologies,
   createHandle,
   deleteHandle,
-  setSpineOntology,
-  removeSpineOntology,
+  setEntityOntology,
+  removeEntityOntology,
   updateSpineLabel,
+  createAnnotation,
+  deleteAnnotation,
 } from '~/db/queries'
 import { InspectPanel, InspectSection, ThingLink, InfoRow } from '~/components/inspect/InspectPanel'
 import { Badge } from '~/components/ui/badge'
@@ -23,17 +27,20 @@ export async function loader({ params }: Route.LoaderArgs) {
   const spine = await getSpine(params.sid!)
   if (!spine) return redirect(`/diagram/${params.id}`)
 
-  const [handles, ontologies, marks, connections, diagrams, recentEdits, allOntologies] = await Promise.all([
-    getHandlesForSpine(params.sid!),
-    getSpineOntologies(params.sid!),
-    getSpineMarks(params.sid!),
-    getLinesForSpine(params.sid!),
-    getDiagramsForSpine(params.sid!),
-    getEditsForEntity(params.sid!, 5),
-    listOntologies(),
-  ])
+  const [handles, ontologies, marks, connections, diagrams, allAnnotations, caps, recentEdits, allOntologies] =
+    await Promise.all([
+      getHandlesForSpine(params.sid!),
+      getEntityOntologies(params.sid!, 'spine'),
+      getEntityMarks(params.sid!),
+      getLinesForSpine(params.sid!),
+      getDiagramsForSpine(params.sid!),
+      getAnnotationsForEntity(params.sid!),
+      getCapabilitiesForEntity(params.sid!),
+      getEditsForEntity(params.sid!, 5),
+      listOntologies(),
+    ])
 
-  return { spine, handles, ontologies, marks, connections, diagrams, recentEdits, allOntologies }
+  return { spine, handles, ontologies, marks, connections, diagrams, allAnnotations, caps, recentEdits, allOntologies }
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
@@ -42,34 +49,37 @@ export async function action({ request, params }: Route.ActionArgs) {
   const spineId = params.sid!
 
   switch (intent) {
-    case 'rename': {
-      const diagramId = params.id!
-      await updateSpineLabel(diagramId, spineId, (form.get('label') as string) || null)
+    case 'rename':
+      await updateSpineLabel(params.id!, spineId, (form.get('label') as string) || null)
       break
-    }
-    case 'add-handle': {
+    case 'add-handle':
       await createHandle(spineId, form.get('name') as string)
       break
-    }
-    case 'delete-handle': {
+    case 'delete-handle':
       await deleteHandle(form.get('handleId') as string)
       break
-    }
-    case 'assign-ontology': {
-      await setSpineOntology(spineId, form.get('ontologyId') as string)
+    case 'assign-ontology':
+      await setEntityOntology(spineId, 'spine', form.get('ontologyId') as string)
       break
-    }
-    case 'remove-ontology': {
-      await removeSpineOntology(spineId, form.get('ontologyId') as string)
+    case 'remove-ontology':
+      await removeEntityOntology(spineId, 'spine', form.get('ontologyId') as string)
       break
-    }
+    case 'add-annotation':
+      await createAnnotation(spineId, 'spine', form.get('kind') as string, {
+        textValue: (form.get('textValue') as string) || undefined,
+      })
+      break
+    case 'delete-annotation':
+      await deleteAnnotation(form.get('annotationId') as string)
+      break
   }
 
   return null
 }
 
 export default function SpineInspect({ loaderData }: Route.ComponentProps) {
-  const { spine, handles, ontologies, marks, connections, diagrams, recentEdits, allOntologies } = loaderData
+  const { spine, handles, ontologies, marks, connections, diagrams, allAnnotations, caps, recentEdits, allOntologies } =
+    loaderData
   const fetcher = useFetcher()
   const [newHandleName, setNewHandleName] = useState('')
   const [labelEditing, setLabelEditing] = useState(false)
@@ -78,12 +88,26 @@ export default function SpineInspect({ loaderData }: Route.ComponentProps) {
   const primaryColor = ontologies[0]?.color ?? null
   const unassignedOntologies = allOntologies.filter(o => !ontologies.some(so => so.id === o.id))
 
+  // Annotations that aren't ontology or mark (those have their own sections)
+  const otherAnnotations = allAnnotations.filter(
+    a => a.kind !== 'ontology' && a.kind !== 'mark' && a.kind !== 'capability'
+  )
+
   return (
     <InspectPanel title={currentLabel ?? 'Spine'} subtitle={spine.id.slice(0, 8)} color={primaryColor}>
-      {/* Identity */}
       <InspectSection title="Info">
         <InfoRow label="ID">
           <code className="text-[10px] text-muted-foreground">{spine.id.slice(0, 12)}...</code>
+        </InfoRow>
+        <InfoRow label="Layer">
+          {spine.layerId ? (
+            <ThingLink
+              to={`../ontology/${spine.layerId}`}
+              label={allOntologies.find(o => o.id === spine.layerId)?.name ?? spine.layerId.slice(0, 8)}
+            />
+          ) : (
+            <span className="text-xs text-muted-foreground italic">none</span>
+          )}
         </InfoRow>
         <InfoRow label="Label">
           {labelEditing ? (
@@ -109,7 +133,6 @@ export default function SpineInspect({ loaderData }: Route.ComponentProps) {
         </InfoRow>
       </InspectSection>
 
-      {/* Handles */}
       <InspectSection title="Handles" count={handles.length}>
         {handles.map(h => (
           <div key={h.id} className="flex items-center group">
@@ -147,7 +170,6 @@ export default function SpineInspect({ loaderData }: Route.ComponentProps) {
         </fetcher.Form>
       </InspectSection>
 
-      {/* Ontologies */}
       <InspectSection title="Ontologies" count={ontologies.length}>
         {ontologies.map(o => (
           <div key={o.id} className="flex items-center group">
@@ -185,7 +207,6 @@ export default function SpineInspect({ loaderData }: Route.ComponentProps) {
         )}
       </InspectSection>
 
-      {/* Marks */}
       {marks.length > 0 && (
         <InspectSection title="Marks" count={marks.length}>
           <div className="flex gap-1 px-3 py-1 flex-wrap">
@@ -198,7 +219,17 @@ export default function SpineInspect({ loaderData }: Route.ComponentProps) {
         </InspectSection>
       )}
 
-      {/* Connections */}
+      {caps.length > 0 && (
+        <InspectSection title="Capabilities" count={caps.length}>
+          {caps.map(c => (
+            <div key={c.annotationId} className="px-3 py-1 text-xs">
+              <span className="font-medium">{c.name}</span>
+              <span className="text-muted-foreground ml-1">({c.triggerOn})</span>
+            </div>
+          ))}
+        </InspectSection>
+      )}
+
       <InspectSection title="Connections" count={connections.length}>
         {connections.map(c => {
           const isSource = c.sourceSpineId === spine.id
@@ -217,14 +248,25 @@ export default function SpineInspect({ loaderData }: Route.ComponentProps) {
         })}
       </InspectSection>
 
-      {/* Diagrams */}
+      {otherAnnotations.length > 0 && (
+        <InspectSection title="Annotations" count={otherAnnotations.length}>
+          {otherAnnotations.map(a => (
+            <ThingLink
+              key={a.id}
+              to={`../annotation/${a.id}`}
+              label={a.kind}
+              sublabel={a.textValue?.slice(0, 20) ?? a.urlValue?.slice(0, 20) ?? ''}
+            />
+          ))}
+        </InspectSection>
+      )}
+
       <InspectSection title="In Diagrams" count={diagrams.length}>
         {diagrams.map(d => (
           <ThingLink key={d.id} to={`/diagram/${d.id}`} label={d.name} icon={<span className="text-xs">📄</span>} />
         ))}
       </InspectSection>
 
-      {/* Recent changes */}
       {recentEdits.length > 0 && (
         <InspectSection title="Recent Changes">
           {recentEdits.map(e => (
