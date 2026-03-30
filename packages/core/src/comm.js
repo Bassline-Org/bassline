@@ -24,15 +24,6 @@ export function port(size = Infinity) {
   return { send, recv, close }
 }
 
-export async function consume(recv, callback) {
-  let msg
-  while (true) {
-    msg = await recv()
-    if (isEOF(msg)) break
-    await callback(msg)
-  }
-}
-
 export function propagator(fn = (v, p) => p(v)) {
   const targets = new Set()
   let closed = false
@@ -55,7 +46,7 @@ export function propagator(fn = (v, p) => p(v)) {
 function defaultCell(current, incoming, update) {
   if (current !== incoming) update(incoming)
 }
-export function cell(merge = defaultCell, init) {
+export function cell(merge = defaultCell, init = undefined) {
   let current = init
   const { send, to, close } = propagator((incoming, propagate) => {
     merge(current, incoming, value => {
@@ -66,9 +57,21 @@ export function cell(merge = defaultCell, init) {
   return { send, to, close, value: () => current }
 }
 
+export function consume(recv, callback) {
+  const p = propagator(callback)
+  const promise = (async () => {
+    while (true) {
+      const msg = await recv()
+      if (isEOF(msg)) break
+      await p.send(msg)
+    }
+    p.close()
+  })()
+  return { to: p.to, promise }
+}
+
 export function net() {
   const ports = new Set()
-
   function join(size) {
     const p = port(size)
     let closed = false

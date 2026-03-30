@@ -1,13 +1,14 @@
 import { test, expect } from 'vitest'
 import { fc, it } from '@fast-check/vitest'
 import { message, update, isEmpty } from '../src/messages.js'
-import { port, consume, isEOF } from '../src/comm.js'
+import { port, consume, isEOF, cell } from '../src/comm.js'
 import { isPlainObject } from '../src/utils.js'
 
 async function collect(recv) {
-  const values = []
-  await consume(recv, v => values.push(v))
-  return values
+  const c = cell((current, incoming, update) => update([...current, incoming]), [])
+  const prop = consume(recv, c.send)
+  await prop.promise
+  return c.value()
 }
 
 // build plain objects via fromEntries to avoid __proto__ prototype poisoning

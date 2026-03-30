@@ -1,4 +1,5 @@
 import { isPlainObject, isSymbol, isFunction } from './utils.js'
+import { propagator } from './comms.js'
 
 export const isEmpty = msg => Object.keys(msg).length === 0
 export function message(content) {
@@ -47,23 +48,23 @@ function assertHandlers(handlers) {
   return syms
 }
 
-export function offer(dest, handlers) {
+export function offer(handlers) {
   const syms = assertHandlers(handlers)
-  return msg => {
+  return propagator((msg, propagate) => {
     const enriched = { ...msg }
     for (const sym of syms) {
       enriched[sym] = m => void handlers[sym](m)
     }
-    dest(enriched)
-  }
+    propagate(enriched)
+  })
 }
 
 export function accept(handlers) {
   const syms = assertHandlers(handlers)
-  if (syms.length === 0) throw new Error('[accept] invalid handlers object, no symbols')
-  return async msg => {
+  return propagator(async (msg, propagate) => {
     for (const sym of syms) {
-      if (hasCap(msg, sym)) await handlers[sym](msg[sym], msg)
+      if (hasCap(msg, sym)) await handlers[sym](msg, msg[sym])
     }
-  }
+    propagate(msg)
+  })
 }

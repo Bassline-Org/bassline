@@ -1,20 +1,22 @@
 import { describe, it, expect } from 'vitest'
-import { port, net, clock, consume, EOF, isEOF, propagator } from '../src/comm.js'
+import { port, net, clock, consume, EOF, isEOF, propagator, cell } from '../src/comm.js'
 
 async function collect(recv) {
-  const values = []
-  await consume(recv, v => values.push(v))
-  return values
+  const c = cell((current, incoming, update) => update([...current, incoming]), [])
+  const prop = consume(recv, c.send)
+  await prop.promise
+  return c.value()
 }
 
 describe('port', () => {
   it('delivers values in order', async () => {
     const p = port()
+    const c = collect(p.recv)
     p.send(1)
     p.send(2)
     p.send(3)
     p.close()
-    expect(await collect(p.recv)).toEqual([1, 2, 3])
+    expect(await c).toEqual([1, 2, 3])
   })
 
   it('drains buffer before returning EOF', async () => {
@@ -36,20 +38,21 @@ describe('port', () => {
 
   it('works when consumer waits for producer', async () => {
     const p = port()
-    const collecting = collect(p.recv)
+    const c = collect(p.recv)
     await Promise.resolve()
     p.send(1)
     p.send(2)
     p.close()
-    expect(await collecting).toEqual([1, 2])
+    expect(await c).toEqual([1, 2])
   })
 
   it('drops sends after close', async () => {
     const p = port()
+    const c = collect(p.recv)
     p.send(1)
     p.close()
     p.send(2)
-    expect(await collect(p.recv)).toEqual([1])
+    expect(await c).toEqual([1])
   })
 
   it('throws when sending EOF', () => {
@@ -165,14 +168,12 @@ describe('clock', () => {
 describe('consume', () => {
   it('processes all messages until EOF', async () => {
     const p = port()
+    const values = collect(p.recv)
     p.send(1)
     p.send(2)
     p.send(3)
     p.close()
-
-    const values = []
-    await consume(p.recv, v => values.push(v))
-    expect(values).toEqual([1, 2, 3])
+    expect(await values).toEqual([1, 2, 3])
   })
 
   it('handles async callbacks', async () => {
@@ -182,10 +183,11 @@ describe('consume', () => {
     p.close()
 
     const values = []
-    await consume(p.recv, async v => {
+    const prop = consume(p.recv, async v => {
       await new Promise(r => setTimeout(r, 5))
       values.push(v)
     })
+    await prop.promise
     expect(values).toEqual(['a', 'b'])
   })
 })

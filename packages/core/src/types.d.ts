@@ -1,16 +1,17 @@
-export const EOF: unique symbol
+export const EOF: symbol
 export function isEOF(v: unknown): v is typeof EOF
 
+export type Void = void | Promise<void>
 export type Message<T = unknown> = Record<string, unknown> & T
 export type Cap<K extends symbol> = { [key in K]: Send }
-export type Propagator<T, K> = {
-  send: Send<T>,
-  close: Close,
+export type Propagator<T = Message, K = T> = {
+  send: Send<T>
+  close: Close
   to: (...dests: Send<K>[]) => () => void
 }
-export type Cell<T, K> = Propagator<T, K> & { value: () => K }
-export type Propagate<T, K> = (value: T, propagate: Send<K>) => void | Promise<void>
-export type Merge<T, K> = (current: K, incoming: T, propagate: Send<K>) => void | Promise<void>
+export type Cell<T = Message, K = unknown> = Propagator<T, K> & { value: () => K }
+export type Propagate<T = Message, K = Message> = (value: T, propagate: Send<K>) => Void
+export type Merge<T, K> = (current: K, incoming: T, propagate: Send<K>) => Void
 
 export type Port<T = Message, K = T> = {
   send: Send<T>
@@ -18,9 +19,9 @@ export type Port<T = Message, K = T> = {
   close: Close
 }
 
-export type Send<T = Message> = (msg: T) => void
+export type Send<T = Message> = (msg: T) => Void
 export type Recv<T = Message> = () => Promise<T | typeof EOF>
-export type Close = () => void
+export type Close = () => Void
 
 export type NetJoin<T, K> = {
   (size?: number): Port<T, K>
@@ -30,20 +31,18 @@ export type NetJoin<T, K> = {
 
 export function port<T = Message, K = T>(size?: number): Port<T, K>
 export function net<T = Message, K = T>(): NetJoin<T, K>
-export function clock(ms?: number): Omit<Port<{ts: number}>, 'send'>
-export function propagator<In = Message, Out = In>(
-  fn?: Propagate<In, Out>
-): Propagator<In, Out>
-export function cell<In = Message, State = In>(
-  fn?: Merge<In, State>,
-  init: State
-): Cell<In, State>
+export function clock(ms?: number): Omit<Port<{ ts: number }>, 'send'>
 
+export function propagator<T>(): Propagator<T, T>
+export function propagator<In = Message, Out = In>(fn: Propagate<In, Out>): Propagator<In, Out>
 
-export function consume<T = Message>(
+export function cell<In = Message, State = In>(fn?: Merge<In, State>, init?: State): Cell<In, State>
+
+export function consume<T = Message>(recv: Recv<T>): { to: Propagator<T>['to']; promise: Promise<void> }
+export function consume<T = Message, K = T>(
   recv: Recv<T>,
-  callback: Send<T>
-): Promise<void>
+  callback: Propagate<T, K>
+): { to: Propagator<T, K>['to']; promise: Promise<void> }
 
 export function message(): Message
 export function message(content: undefined): Message
@@ -52,25 +51,16 @@ export function message<T>(content: T): Message<{ body: T }>
 
 type Mapping<T, U = T> = (msg: T) => U
 
-export function update<T, U>(
-  fn: Mapping<T, U>
-): Mapping<T, Message<U>>
-export function update<T, U>(
-  msg: T,
-  fn: Mapping<T, U>
-): Message<U>
-
-export function subst(msg: Message<{let: Message, in: Message}>): Message
-
-// --- Capabilities ---
+export function update<T, U>(fn: Mapping<T, U>): Mapping<T, Message<U>>
+export function update<T, U>(msg: T, fn: Mapping<T, U>): Message<U>
 
 export function hasCap<K extends symbol>(msg: Message, name: K): msg is Message & Cap<K>
 
 export type OfferHandlers = Record<symbol, Send>
-export type AcceptHandlers = Record<symbol, (cap: Send, msg: Message) => void | Promise<void>>
+export type AcceptHandlers = Record<symbol, Propagate>
 
-export function offer(dest: Send, handlers: OfferHandlers): Send
-export function accept(handlers: AcceptHandlers): Send
+export function offer(handlers: OfferHandlers): Propagator
+export function accept(handlers: AcceptHandlers): Propagator
 
 export function isEmpty(msg: Message): msg is {}
 export class Fault extends Error {
@@ -105,3 +95,5 @@ export function fromPort(port: unknown): Port<Message>
 
 export function readFrame(recv: () => Promise<unknown>, send: (msg: Message) => void): void
 export function format(msg: unknown): string
+
+//export function subst(msg: Message<{let: Message, in: Message}>): Message

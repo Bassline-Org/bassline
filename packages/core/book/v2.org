@@ -127,26 +127,11 @@ export function port(size = Infinity) {
 
 **** Port usage
 
-***** Consume
-
-The most common way to use a port, is inside of an endless async loop that exists when we recv EOF.
-
-We define a helper for this called =consume=. It let's us build actor-like processes from our ports.
-
-#+begin_src js
-export async function consume(recv, callback) {
-  let msg
-  while (true) {
-    msg = await recv()
-    if (isEOF(msg)) break
-    await callback(msg)
-  }
-}
-#+end_src
-
 ***** Propagator
 
-Sometimes we want fan-out behavior, propagators let us selectively propagate messages to multiple targets.
+A propagator let's us define something, which can selectively propagate interesting messages to multiple targets.
+
+Cycles are supported and encouraged, so long as you correctly setup your propagators to ignore.
 
 #+begin_src js
 export function propagator(fn = (v, p) => p(v)) {
@@ -177,7 +162,7 @@ A propagator with state
 function defaultCell(current, incoming, update) {
   if(current !== incoming) update(incoming)
 }
-export function cell(merge = defaultCell, init) {
+export function cell(merge = defaultCell, init = undefined) {
   let current = init
   const {send, to, close} = propagator((incoming, propagate) => {
     merge(current, incoming, value => {
@@ -186,6 +171,28 @@ export function cell(merge = defaultCell, init) {
     })
   })
   return { send, to, close, value: () => current }
+}
+#+end_src
+
+***** Consume
+
+The most common way to use a port, is inside of an endless async loop that exists when we recv EOF.
+
+We define a helper for this called =consume=. It let's us use a recv fn to manage the inputs for a propagator, as well
+as it's lifecycle.
+
+#+begin_src js
+export function consume(recv, callback) {
+  const p = propagator(callback)
+  const promise = (async () => {
+    while (true) {
+      const msg = await recv()
+      if (isEOF(msg)) break
+      await p.send(msg)
+    }
+    p.close()
+  })()
+  return { to: p.to, promise }
 }
 #+end_src
 
@@ -205,7 +212,6 @@ This highlights that in bassline cooperating participants appear as a single par
 #+begin_src js
 export function net() {
   const ports = new Set()
-
   function join(size) {
     const p = port(size)
     let closed = false
@@ -299,6 +305,7 @@ The concrete representation is intentionally minimal. Plain objects are open-end
 
   #+begin_src js
 import { isPlainObject, isSymbol, isFunction } from './utils.js'
+import { propagator } from "./comms.js"
 
 export const isEmpty = msg => Object.keys(msg).length === 0
 export function message(content) {
@@ -466,25 +473,25 @@ function assertHandlers(handlers) {
   return syms
 }
 
-export function offer(dest, handlers) {
+export function offer(handlers) {
   const syms = assertHandlers(handlers)
-  return msg => {
+  return propagator((msg, propagate) => {
     const enriched = { ...msg }
     for (const sym of syms) {
       enriched[sym] = m => void handlers[sym](m)
     }
-    dest(enriched)
-  }
+    propagate(enriched)
+  })
 }
 
 export function accept(handlers) {
   const syms = assertHandlers(handlers)
-  if (syms.length === 0) throw new Error('[accept] invalid handlers object, no symbols')
-  return async msg => {
+  return propagator(async (msg, propagate) => {
     for (const sym of syms) {
-      if (hasCap(msg, sym)) await handlers[sym](msg[sym], msg)
+      if (hasCap(msg, sym)) await handlers[sym](msg, msg[sym])
     }
-  }
+    propagate(msg)
+  })
 }
 #+end_src
 
