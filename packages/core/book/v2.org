@@ -125,13 +125,13 @@ export function port(size = Infinity) {
 }
 #+end_src
 
-**** Using a port
+**** Port usage
+
+***** Consume
 
 The most common way to use a port, is inside of an endless async loop that exists when we recv EOF.
 
-We define a helper for this called =consume=. It let's us build actor-like processes from our ports, and is convenient.
-
-If you need to define more sophisticated control flow inside of the loop, just write the extra 3 lines. :)
+We define a helper for this called =consume=. It let's us build actor-like processes from our ports.
 
 #+begin_src js
 export async function consume(recv, callback) {
@@ -141,6 +141,51 @@ export async function consume(recv, callback) {
     if (isEOF(msg)) break
     await callback(msg)
   }
+}
+#+end_src
+
+***** Propagator
+
+Sometimes we want fan-out behavior, propagators let us selectively propagate messages to multiple targets.
+
+#+begin_src js
+export function propagator(fn = (v, p) => p(v)) {
+  const targets = new Set()
+  let closed = false;
+  const propagate = value => targets.forEach(t => t(value))
+  async function send(value) {
+    if(closed) return
+    await fn(value, propagate)
+  }
+  function to(...dests) {
+    dests.forEach(d => targets.add(d))
+    return () => dests.forEach(d => targets.delete(d))
+  }
+  function close() {
+    closed = true
+    targets.clear()
+  }
+  return { send, to, close }
+}
+#+end_src
+
+***** Cell
+
+A propagator with state
+
+#+begin_src js
+function defaultCell(current, incoming, update) {
+  if(current !== incoming) update(incoming)
+}
+export function cell(merge = defaultCell, init) {
+  let current = init
+  const {send, to, close} = propagator((incoming, propagate) => {
+    merge(current, incoming, value => {
+      current = value
+      propagate(value)
+    })
+  })
+  return { send, to, close, value: () => current }
 }
 #+end_src
 
@@ -195,11 +240,11 @@ A clock is an example of a one-sided communication participant, it can say thing
 It can be used with anything that wants a capability to receive information, and can be used for local chron jobs, scheduling, and similar things.
 
 #+begin_src js
-export const clock = (ms = 1000) => {
+export function clock(ms = 1000, eager = true) {
   const p = port(1)
   const tick = () => p.send({ ts: Date.now() })
   const interval = setInterval(tick, ms)
-  tick()
+  if(eager) tick()
   return {
     recv: p.recv,
     close: () => {
@@ -253,10 +298,10 @@ The concrete representation is intentionally minimal. Plain objects are open-end
 - Anything else is wrapped as ={body: value}=.
 
   #+begin_src js
-import { isPlainObject, isString, isSymbol, isFunction, hasKeys } from './utils.js'
+import { isPlainObject, isSymbol, isFunction } from './utils.js'
 
 export const isEmpty = msg => Object.keys(msg).length === 0
-export const message = content => {
+export function message(content) {
   if (content === undefined) return {}
   if (isPlainObject(content)) return { ...content }
   return { body: content }
@@ -350,7 +395,7 @@ Expansion is intentionally tiny:
 =lift= does the opposite, given a message, it will extract all keys from a message,
 producing a =let:in:= that reduces to the message.
 
-#+begin_src js
+#+begin_src js :tangle no
 export function subst(msg) {
   switch (true) {
     case !hasKeys(msg, ['let', 'in']):
@@ -776,10 +821,30 @@ export const delay = async (ms = 1000) => {
     return
 }
 #+end_src
+
 ** Misc
 #+begin_src js
 export const castArr = value => (isArray(value) ? value : [value])
 #+end_src
+
+** Tables
+I might remove these utils, but i'm testing something.
+
+#+begin_src js
+export const keys = o => isNil(o) ? [] : Object.keys(o)
+export const values = o => isNil(o) ? [] : Object.values(o)
+export const syms = o => isNil(o) ? [] : Object.getOwnSymbolNames(o)
+export const index = (keys, table) => keys.map(k => table[k])
+export const path = (keys, table) => {
+  let ctx = table;
+  for(const key of keys) {
+    if(isNil(ctx)) break
+    ctx = table[key]
+  }
+  return ctx
+}
+#+end_src
+
 
 #+BEGIN_EXPORT html
 <footer class="book-footer">

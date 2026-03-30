@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { port, net, clock, consume, EOF, isEOF } from '../src/comm.js'
+import { port, net, clock, consume, EOF, isEOF, propagator } from '../src/comm.js'
 
 async function collect(recv) {
   const values = []
@@ -200,5 +200,74 @@ describe('isEOF', () => {
     expect(isEOF(undefined)).toBe(false)
     expect(isEOF(42)).toBe(false)
     expect(isEOF(Symbol())).toBe(false)
+  })
+})
+
+describe('propagator', () => {
+  const counter = () => {
+    const c = {
+      count: 0,
+      inc: () => c.count++,
+    }
+    return c
+  }
+
+  it('propagates', () => {
+    const c = counter()
+    const p = propagator()
+    const remove = p.to(c.inc)
+    p.send(10)
+    p.send(10)
+    remove()
+    p.send(10)
+
+    expect(c.count).toEqual(2)
+  })
+
+  it('attenuates', () => {
+    const c = counter()
+    const p = propagator((v, p) => v < 5 && p(v))
+    p.to(c.inc)
+
+    p.send(1)
+    p.send(2)
+    p.send(6)
+
+    expect(c.count).toEqual(2)
+  })
+
+  it('handles cycles', () => {
+    let n = 0
+    const a = propagator((v, p) => p(v + 1))
+    const b = propagator((v, p) => {
+      if (v >= 10) n = v
+      else p(v + 1)
+    })
+    a.to(b.send)
+    b.to(a.send)
+
+    a.send(1)
+
+    expect(n).toEqual(10)
+
+    b.send(20)
+
+    expect(n).toEqual(20)
+  })
+
+  it('handles close', () => {
+    const c = counter()
+    const a = propagator()
+    a.to(c.inc)
+
+    a.send(1)
+
+    expect(c.count).toEqual(1)
+
+    a.close()
+
+    a.send(1)
+
+    expect(c.count).toEqual(1)
   })
 })

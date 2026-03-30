@@ -33,6 +33,39 @@ export async function consume(recv, callback) {
   }
 }
 
+export function propagator(fn = (v, p) => p(v)) {
+  const targets = new Set()
+  let closed = false
+  const propagate = value => targets.forEach(t => t(value))
+  async function send(value) {
+    if (closed) return
+    await fn(value, propagate)
+  }
+  function to(...dests) {
+    dests.forEach(d => targets.add(d))
+    return () => dests.forEach(d => targets.delete(d))
+  }
+  function close() {
+    closed = true
+    targets.clear()
+  }
+  return { send, to, close }
+}
+
+function defaultCell(current, incoming, update) {
+  if (current !== incoming) update(incoming)
+}
+export function cell(merge = defaultCell, init) {
+  let current = init
+  const { send, to, close } = propagator((incoming, propagate) => {
+    merge(current, incoming, value => {
+      current = value
+      propagate(value)
+    })
+  })
+  return { send, to, close, value: () => current }
+}
+
 export function net() {
   const ports = new Set()
 
@@ -61,11 +94,11 @@ export function net() {
   return join
 }
 
-export const clock = (ms = 1000) => {
+export function clock(ms = 1000, eager = true) {
   const p = port(1)
   const tick = () => p.send({ ts: Date.now() })
   const interval = setInterval(tick, ms)
-  tick()
+  if (eager) tick()
   return {
     recv: p.recv,
     close: () => {

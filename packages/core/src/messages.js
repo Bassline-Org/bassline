@@ -1,7 +1,7 @@
-import { isPlainObject, isString, isSymbol, isFunction, hasKeys } from './utils.js'
+import { isPlainObject, isSymbol, isFunction } from './utils.js'
 
 export const isEmpty = msg => Object.keys(msg).length === 0
-export const message = content => {
+export function message(content) {
   if (content === undefined) return {}
   if (isPlainObject(content)) return { ...content }
   return { body: content }
@@ -35,44 +35,6 @@ export class Fault extends Error {
 }
 
 export const fault = (condition, msg, context) => new Fault(condition, msg, context)
-
-export function subst(msg) {
-  switch (true) {
-    case !hasKeys(msg, ['let', 'in']):
-      throw fault('expand requires msg to have keys let & in')
-    case !isPlainObject(msg.let):
-    case !isPlainObject(msg.in):
-      throw fault('msg.in & msg.let must be objects')
-    default:
-      return rewrite(msg.let, msg.in)
-  }
-}
-
-export function lift(msg) {
-  const let_ = {}
-  const in_ = { ...msg }
-  for (const f of Object.keys(msg)) {
-    let_[f] = msg[f]
-    in_[f] = f
-  }
-  return { let: let_, in: in_ }
-}
-
-function rewrite(bindings, value) {
-  switch (true) {
-    case isString(value) && value in bindings:
-      return bindings[value]
-    case Array.isArray(value):
-      return value.map(item => rewrite(bindings, item))
-    case isPlainObject(value): {
-      const out = {}
-      for (const [k, v] of Object.entries(value)) out[k] = rewrite(bindings, v)
-      return out
-    }
-    default:
-      return value
-  }
-}
 
 export const hasCap = (msg, name) => msg[name] && isFunction(msg[name])
 

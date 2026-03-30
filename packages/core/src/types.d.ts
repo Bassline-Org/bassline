@@ -3,6 +3,14 @@ export function isEOF(v: unknown): v is typeof EOF
 
 export type Message<T = unknown> = Record<string, unknown> & T
 export type Cap<K extends symbol> = { [key in K]: Send }
+export type Propagator<T, K> = {
+  send: Send<T>,
+  close: Close,
+  to: (...dests: Send<K>[]) => () => void
+}
+export type Cell<T, K> = Propagator<T, K> & { value: () => K }
+export type Propagate<T, K> = (value: T, propagate: Send<K>) => void | Promise<void>
+export type Merge<T, K> = (current: K, incoming: T, propagate: Send<K>) => void | Promise<void>
 
 export type Port<T = Message, K = T> = {
   send: Send<T>
@@ -23,6 +31,14 @@ export type NetJoin<T, K> = {
 export function port<T = Message, K = T>(size?: number): Port<T, K>
 export function net<T = Message, K = T>(): NetJoin<T, K>
 export function clock(ms?: number): Omit<Port<{ts: number}>, 'send'>
+export function propagator<In = Message, Out = In>(
+  fn?: Propagate<In, Out>
+): Propagator<In, Out>
+export function cell<In = Message, State = In>(
+  fn?: Merge<In, State>,
+  init: State
+): Cell<In, State>
+
 
 export function consume<T = Message>(
   recv: Recv<T>,

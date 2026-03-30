@@ -26,3 +26,16 @@ export const delay = async (ms = 1000) => {
 }
 
 export const castArr = value => (isArray(value) ? value : [value])
+
+export const keys = o => (isNil(o) ? [] : Object.keys(o))
+export const values = o => (isNil(o) ? [] : Object.values(o))
+export const syms = o => (isNil(o) ? [] : Object.getOwnSymbolNames(o))
+export const index = (keys, table) => keys.map(k => table[k])
+export const path = (keys, table) => {
+  let ctx = table
+  for (const key of keys) {
+    if (isNil(ctx)) break
+    ctx = table[key]
+  }
+  return ctx
+}

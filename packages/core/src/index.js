@@ -1,6 +1,6 @@
-export { message, update, subst, isEmpty, Fault, fault, lift, offer, accept, hasCap } from './messages.js'
+export { message, update, isEmpty, Fault, fault, offer, accept, hasCap } from './messages.js'
 
-export { EOF, isEOF, port, net, clock, consume } from './comm.js'
+export { EOF, isEOF, port, net, clock, consume, propagator, cell } from './comm.js'
 
 export {
   isArray,
