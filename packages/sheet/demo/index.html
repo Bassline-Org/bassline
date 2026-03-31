@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Sheet Editor</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'SF Mono', 'Menlo', monospace; font-size: 13px; background: #1a1a2e; color: #e0e0e0; display: flex; height: 100vh; }
+
+  /* Grid */
+  #grid-wrap { flex: 1; overflow: auto; padding: 12px; }
+  table { border-collapse: collapse; }
+  th { background: #16213e; color: #8888aa; padding: 4px 12px; font-weight: normal; position: sticky; top: 0; z-index: 1; }
+  th.corner { position: sticky; left: 0; z-index: 2; }
+  th.row-header { position: sticky; left: 0; background: #16213e; text-align: right; padding-right: 8px; }
+  td { border: 1px solid #2a2a4a; padding: 4px 8px; min-width: 80px; height: 28px; cursor: cell; white-space: nowrap; user-select: none; -webkit-user-select: none; }
+  td.selected { outline: 2px solid #4fc3f7; outline-offset: -2px; background: #1a2744; }
+  td.in-selection { background: #1a2744; }
+  td.region-drag { background: #2a3754; outline: 1px solid #4fc3f7; }
+  td input { background: none; border: none; color: #fff; font: inherit; width: 100%; outline: none; }
+
+  /* Sidebar */
+  #sidebar { width: 320px; background: #16213e; border-left: 1px solid #2a2a4a; overflow-y: auto; display: flex; flex-direction: column; }
+  .panel { padding: 12px; border-bottom: 1px solid #2a2a4a; }
+  .panel h3 { color: #4fc3f7; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+  .panel label { color: #8888aa; font-size: 11px; }
+  .panel input, .panel select { background: #1a1a2e; border: 1px solid #2a2a4a; color: #e0e0e0; font: inherit; padding: 3px 6px; border-radius: 3px; margin: 2px 0; }
+  .panel input:focus { border-color: #4fc3f7; outline: none; }
+  .row { display: flex; gap: 6px; align-items: center; margin: 4px 0; }
+  .row label { min-width: 50px; }
+  .row input { flex: 1; }
+  button { background: #2a2a4a; border: 1px solid #3a3a5a; color: #e0e0e0; font: inherit; padding: 3px 10px; border-radius: 3px; cursor: pointer; }
+  button:hover { background: #3a3a5a; }
+  button.danger { border-color: #e57373; color: #e57373; }
+
+  /* Event log */
+  #log { flex: 1; overflow-y: auto; }
+  #log .entry { padding: 2px 0; color: #8888aa; font-size: 11px; border-bottom: 1px solid #1a1a2e; }
+  #log .entry .type { color: #4fc3f7; }
+
+  /* Values store */
+  .val-entry { display: flex; gap: 6px; align-items: center; padding: 2px 0; font-size: 11px; }
+  .val-entry .vid { color: #4fc3f7; cursor: pointer; min-width: 60px; }
+  .val-entry .vval { color: #e0e0e0; }
+
+  /* Selection list */
+  .sel-entry { padding: 4px 0; border-bottom: 1px solid #1a1a2e; cursor: pointer; }
+  .sel-entry:hover { background: #1a1a2e; }
+  .sel-entry .sel-name { color: #81c784; font-weight: bold; }
+  .sel-entry .sel-bounds { color: #8888aa; font-size: 11px; }
+</style>
+</head>
+<body>
+
+<div id="grid-wrap"><table id="grid"></table></div>
+
+<div id="sidebar">
+  <!-- Cell Inspector -->
+  <div class="panel" id="inspector">
+    <h3>Cell Inspector</h3>
+    <div id="no-cell" style="color:#8888aa">Click a cell to inspect</div>
+    <div id="cell-info" style="display:none">
+      <div class="row"><label>Pos</label><span id="cell-pos"></span></div>
+      <div class="row"><label>Value</label><input id="cell-value" placeholder="(empty)"></div>
+      <div class="row"><label>ID</label><span id="cell-id" style="color:#4fc3f7"></span></div>
+      <div class="row"><label>Link</label><input id="cell-link" placeholder="value ID to link"></div>
+      <div class="row">
+        <button id="btn-set">Set</button>
+        <button id="btn-link">Link</button>
+        <button id="btn-clear" class="danger">Clear</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Selections -->
+  <div class="panel">
+    <h3>Selections <button id="btn-new-sel" style="float:right;font-size:11px">+ New</button></h3>
+    <div id="sel-list"></div>
+  </div>
+
+  <!-- Values Store -->
+  <div class="panel">
+    <h3>Values Store</h3>
+    <div id="val-list"></div>
+  </div>
+
+  <!-- Event Log -->
+  <div class="panel" style="flex:1;display:flex;flex-direction:column">
+    <h3>Event Log <button id="btn-clear-log" style="float:right;font-size:11px">Clear</button></h3>
+    <div id="log"></div>
+  </div>
+</div>
+
+<script type="module">
+import { Sheet } from '../src/sheet.js'
+import { createRegistry } from '../src/commands.js'
+
+const ROWS = 30, COLS = 15
+let sheet, commands, cursor = null, editing = false, eventLog = []
+let dragStart = null, dragEnd = null, dragging = false
+
+// --- Init ---
+function init() {
+  const saved = localStorage.getItem('sheet-data')
+  sheet = saved ? Sheet.fromJSON(saved) : new Sheet()
+  commands = createRegistry(sheet)
+  const savedLog = localStorage.getItem('sheet-log')
+  if (savedLog) eventLog = JSON.parse(savedLog)
+
+  sheet.on(msg => {
+    eventLog.push(msg)
+    if (eventLog.length > 200) eventLog.shift()
+    save()
+    renderCell(msg.r, msg.c)
+    if (msg.type === 'update') renderAllCellsWithId(msg.id)
+    renderInspector()
+    renderLog()
+    renderValues()
+    renderSelections()
+  })
+
+  buildGrid()
+  renderAllCells()
+  renderLog()
+  renderValues()
+  renderSelections()
+}
+
+function save() {
+  localStorage.setItem('sheet-data', JSON.stringify(sheet))
+  localStorage.setItem('sheet-log', JSON.stringify(eventLog))
+}
+
+// --- Grid ---
+function buildGrid() {
+  const table = document.getElementById('grid')
+  table.innerHTML = ''
+  // Header row
+  const thead = document.createElement('tr')
+  const corner = document.createElement('th')
+  corner.className = 'corner'
+  thead.appendChild(corner)
+  for (let c = 0; c < COLS; c++) {
+    const th = document.createElement('th')
+    th.textContent = c
+    thead.appendChild(th)
+  }
+  table.appendChild(thead)
+  // Data rows
+  for (let r = 0; r < ROWS; r++) {
+    const tr = document.createElement('tr')
+    const rh = document.createElement('th')
+    rh.className = 'row-header'
+    rh.textContent = r
+    tr.appendChild(rh)
+    for (let c = 0; c < COLS; c++) {
+      const td = document.createElement('td')
+      td.dataset.r = r
+      td.dataset.c = c
+      td.onmousedown = e => {
+        if (e.detail === 2) { startEdit(r, c); return } // double-click
+        dragging = true
+        dragStart = [r, c]
+        dragEnd = [r, c]
+        selectCell(r, c)
+        renderDragRegion()
+        e.preventDefault()
+      }
+      td.onmouseenter = () => {
+        if (!dragging) return
+        dragEnd = [r, c]
+        renderDragRegion()
+      }
+      tr.appendChild(td)
+    }
+    table.appendChild(tr)
+  }
+
+  document.addEventListener('mouseup', () => {
+    if (!dragging) return
+    dragging = false
+    // Keep dragStart/dragEnd for Ctrl+Enter execution
+    // Visual highlight stays until next click
+  })
+}
+
+function renderDragRegion() {
+  clearDragRegion()
+  if (!dragStart || !dragEnd) return
+  const r0 = Math.min(dragStart[0], dragEnd[0]), r1 = Math.max(dragStart[0], dragEnd[0])
+  const c0 = Math.min(dragStart[1], dragEnd[1]), c1 = Math.max(dragStart[1], dragEnd[1])
+  for (let r = r0; r <= r1; r++)
+    for (let c = c0; c <= c1; c++) {
+      const td = getCell(r, c)
+      if (td) td.classList.add('region-drag')
+    }
+}
+
+function clearDragRegion() {
+  document.querySelectorAll('td.region-drag').forEach(td => td.classList.remove('region-drag'))
+}
+
+function getCell(r, c) {
+  return document.querySelector(`td[data-r="${r}"][data-c="${c}"]`)
+}
+
+function renderCell(r, c) {
+  if (r == null || c == null) return
+  const td = getCell(r, c)
+  if (!td || editing && cursor && cursor[0] === r && cursor[1] === c) return
+  const val = sheet.get([r, c])
+  td.textContent = val != null ? String(val) : ''
+}
+
+function renderAllCells() {
+  for (let r = 0; r < ROWS; r++)
+    for (let c = 0; c < COLS; c++)
+      renderCell(r, c)
+}
+
+function renderAllCellsWithId(vid) {
+  for (const entry of sheet.entries()) {
+    if (entry.id === vid) renderCell(entry.r, entry.c)
+  }
+}
+
+function updateSelectionHighlights() {
+  document.querySelectorAll('td.in-selection').forEach(td => td.classList.remove('in-selection'))
+  for (const [, region] of sheet.selections) {
+    for (let r = region.r[0]; r <= Math.min(region.r[1], ROWS - 1); r++) {
+      for (let c = region.c[0]; c <= Math.min(region.c[1], COLS - 1); c++) {
+        const td = getCell(r, c)
+        if (td) td.classList.add('in-selection')
+      }
+    }
+  }
+}
+
+// --- Selection ---
+function selectCell(r, c) {
+  document.querySelectorAll('td.selected').forEach(td => td.classList.remove('selected'))
+  cursor = [r, c]
+  const td = getCell(r, c)
+  if (td) td.classList.add('selected')
+  renderInspector()
+}
+
+function startEdit(r, c) {
+  if (editing) return
+  editing = true
+  cursor = [r, c]
+  const td = getCell(r, c)
+  if (!td) return
+  const input = document.createElement('input')
+  input.value = sheet.get([r, c]) ?? ''
+  td.textContent = ''
+  td.appendChild(input)
+  input.focus()
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { commitEdit(r, c, input.value); e.preventDefault() }
+    if (e.key === 'Escape') { cancelEdit(r, c); e.preventDefault() }
+  })
+  input.addEventListener('blur', () => commitEdit(r, c, input.value))
+}
+
+function commitEdit(r, c, value) {
+  if (!editing) return
+  editing = false
+  const trimmed = value.trim()
+  if (trimmed === '') {
+    sheet.clear([r, c])
+  } else {
+    const num = Number(trimmed)
+    sheet.set([r, c], isNaN(num) || trimmed === '' ? trimmed : num)
+  }
+  renderCell(r, c)
+  selectCell(r, c)
+}
+
+function cancelEdit(r, c) {
+  editing = false
+  renderCell(r, c)
+  selectCell(r, c)
+}
+
+// --- Keyboard ---
+document.addEventListener('keydown', e => {
+  // Ctrl+Enter — execute selected region as command
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+    let r0, c0, r1, c1
+    if (dragStart && dragEnd && (dragStart[0] !== dragEnd[0] || dragStart[1] !== dragEnd[1])) {
+      // Use drag selection
+      r0 = Math.min(dragStart[0], dragEnd[0]); r1 = Math.max(dragStart[0], dragEnd[0])
+      c0 = Math.min(dragStart[1], dragEnd[1]); c1 = Math.max(dragStart[1], dragEnd[1])
+    } else if (cursor) {
+      // No drag — scan the cursor's row for contiguous non-empty cells
+      const [r, c] = cursor
+      // Find leftmost non-empty cell in this row
+      let left = c
+      while (left > 0 && sheet.get([r, left - 1]) != null) left--
+      // Find rightmost non-empty cell in this row
+      let right = c
+      while (right < COLS - 1 && sheet.get([r, right + 1]) != null) right++
+      r0 = r; r1 = r; c0 = left; c1 = right
+    } else {
+      return
+    }
+    try {
+      const result = commands.exec(r0, c0, r1, c1)
+      if (result !== undefined) console.log('exec result:', result)
+    } catch (err) {
+      console.error('exec error:', err.message)
+      eventLog.push({ type: 'error', message: err.message })
+      renderLog()
+    }
+    e.preventDefault()
+    return
+  }
+  if (editing) return
+  if (!cursor) return
+  const [r, c] = cursor
+  if (e.key === 'ArrowUp' && r > 0) { selectCell(r - 1, c); e.preventDefault() }
+  if (e.key === 'ArrowDown' && r < ROWS - 1) { selectCell(r + 1, c); e.preventDefault() }
+  if (e.key === 'ArrowLeft' && c > 0) { selectCell(r, c - 1); e.preventDefault() }
+  if (e.key === 'ArrowRight' && c < COLS - 1) { selectCell(r, c + 1); e.preventDefault() }
+  if (e.key === 'Enter') { startEdit(r, c); e.preventDefault() }
+  if (e.key === 'Delete' || e.key === 'Backspace') { sheet.clear([r, c]); e.preventDefault() }
+  // Start typing → start editing
+  if (e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey) {
+    startEdit(r, c)
+    // Let the key go through to the input
+  }
+})
+
+// --- Inspector ---
+function renderInspector() {
+  const noCell = document.getElementById('no-cell')
+  const info = document.getElementById('cell-info')
+  if (!cursor) { noCell.style.display = ''; info.style.display = 'none'; return }
+  noCell.style.display = 'none'
+  info.style.display = ''
+  const [r, c] = cursor
+  const val = sheet.get([r, c])
+  const vid = sheet.ref([r, c])
+  document.getElementById('cell-pos').textContent = `[${r}, ${c}]`
+  document.getElementById('cell-value').value = val != null ? String(val) : ''
+  document.getElementById('cell-id').textContent = vid ?? '(empty)'
+  document.getElementById('cell-link').value = ''
+}
+
+document.getElementById('btn-set').onclick = () => {
+  if (!cursor) return
+  const val = document.getElementById('cell-value').value.trim()
+  const num = Number(val)
+  sheet.set(cursor, val === '' ? '' : (isNaN(num) ? val : num))
+}
+
+document.getElementById('btn-link').onclick = () => {
+  if (!cursor) return
+  const vid = document.getElementById('cell-link').value.trim()
+  if (!vid) return
+  if (sheet.resolve(vid) == null) { alert(`Value ID "${vid}" not found`); return }
+  sheet.link(cursor, vid)
+}
+
+document.getElementById('btn-clear').onclick = () => {
+  if (!cursor) return
+  sheet.clear(cursor)
+}
+
+// --- Selections ---
+function renderSelections() {
+  const list = document.getElementById('sel-list')
+  list.innerHTML = ''
+  for (const [name, region] of sheet.selections) {
+    const div = document.createElement('div')
+    div.className = 'sel-entry'
+    const meta = Object.entries(region).filter(([k]) => k !== 'r' && k !== 'c').map(([k, v]) => `${k}=${v}`).join(' ')
+    div.innerHTML = `<span class="sel-name">${name}</span> <span class="sel-bounds">r[${region.r}] c[${region.c}]</span> ${meta}`
+    div.onclick = () => {
+      // Highlight cells in this selection
+      updateSelectionHighlights()
+    }
+    const del = document.createElement('button')
+    del.textContent = 'x'
+    del.className = 'danger'
+    del.style.cssText = 'float:right;padding:0 5px;font-size:10px'
+    del.onclick = e => { e.stopPropagation(); sheet.selections.delete(name); sheet._emit({ type: 'select', name, region: null }); }
+    div.appendChild(del)
+    list.appendChild(div)
+  }
+  updateSelectionHighlights()
+}
+
+document.getElementById('btn-new-sel').onclick = () => {
+  const name = prompt('Selection name:')
+  if (!name) return
+  // Use current drag region if available, otherwise prompt
+  if (dragStart && dragEnd && (dragStart[0] !== dragEnd[0] || dragStart[1] !== dragEnd[1])) {
+    const r0 = Math.min(dragStart[0], dragEnd[0]), r1 = Math.max(dragStart[0], dragEnd[0])
+    const c0 = Math.min(dragStart[1], dragEnd[1]), c1 = Math.max(dragStart[1], dragEnd[1])
+    sheet.select(name, { r: [r0, r1], c: [c0, c1] })
+  } else {
+    const r0 = parseInt(prompt('Row start:', '0') ?? '0')
+    const r1 = parseInt(prompt('Row end:', '5') ?? '5')
+    const c0 = parseInt(prompt('Col start:', '0') ?? '0')
+    const c1 = parseInt(prompt('Col end:', '5') ?? '5')
+    sheet.select(name, { r: [r0, r1], c: [c0, c1] })
+  }
+}
+
+// --- Values Store ---
+function renderValues() {
+  const list = document.getElementById('val-list')
+  list.innerHTML = ''
+  for (const [vid, val] of sheet.values) {
+    const div = document.createElement('div')
+    div.className = 'val-entry'
+    const idSpan = document.createElement('span')
+    idSpan.className = 'vid'
+    idSpan.textContent = vid
+    idSpan.title = 'Click to highlight cells using this value'
+    idSpan.onclick = () => {
+      document.querySelectorAll('td.selected').forEach(td => td.classList.remove('selected'))
+      for (const entry of sheet.entries()) {
+        if (entry.id === vid) {
+          const td = getCell(entry.r, entry.c)
+          if (td) td.classList.add('selected')
+        }
+      }
+    }
+    const valSpan = document.createElement('span')
+    valSpan.className = 'vval'
+    valSpan.textContent = JSON.stringify(val)
+    const editBtn = document.createElement('button')
+    editBtn.textContent = 'edit'
+    editBtn.style.cssText = 'font-size:10px;padding:0 4px'
+    editBtn.onclick = () => {
+      const nv = prompt(`Update value ${vid}:`, String(val))
+      if (nv == null) return
+      const num = Number(nv)
+      sheet.update(vid, isNaN(num) || nv.trim() === '' ? nv : num)
+    }
+    div.appendChild(idSpan)
+    div.appendChild(valSpan)
+    div.appendChild(editBtn)
+    list.appendChild(div)
+  }
+}
+
+// --- Event Log ---
+function renderLog() {
+  const log = document.getElementById('log')
+  log.innerHTML = ''
+  const recent = eventLog.slice(-50).reverse()
+  for (const msg of recent) {
+    const div = document.createElement('div')
+    div.className = 'entry'
+    let text = `<span class="type">${msg.type}</span> `
+    if (msg.type === 'error') { text += msg.message || 'unknown error' }
+    if (msg.r != null) text += `[${msg.r},${msg.c}] `
+    if (msg.id) {
+      const resolved = sheet.resolve(msg.id)
+      text += `<span style="color:#4fc3f7">${msg.id}</span> `
+      if (resolved != null) text += `= ${JSON.stringify(resolved)} `
+    }
+    if (msg.value != null && !msg.id) text += `= ${JSON.stringify(msg.value)} `
+    if (msg.name) text += `"${msg.name}" `
+    div.innerHTML = text
+    log.appendChild(div)
+  }
+}
+
+document.getElementById('btn-clear-log').onclick = () => {
+  eventLog = []
+  localStorage.removeItem('sheet-log')
+  renderLog()
+}
+
+// --- Boot ---
+init()
+</script>
+</body>
+</html>
