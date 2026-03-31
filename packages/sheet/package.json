@@ -4,7 +4,10 @@
   "description": "Table / spreadsheet tools for bassline",
   "type": "module",
   "exports": {
-    ".": "./src/index.js"
+    ".": {
+      "types": "./src/types.d.ts",
+      "default": "./src/index.js"
+    }
   },
   "scripts": {},
   "license": "AGPL-3.0",

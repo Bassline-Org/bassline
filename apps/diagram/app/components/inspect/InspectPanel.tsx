@@ -21,7 +21,7 @@ export function InspectPanel({
           <X size={14} />
         </Link>
         {color && <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: color }} />}
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <h2 className="text-sm font-semibold truncate">{title}</h2>
           {subtitle && <p className="text-[10px] text-muted-foreground truncate">{subtitle}</p>}
         </div>

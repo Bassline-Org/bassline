@@ -1,68 +1,94 @@
-import { Link, useFetcher, redirect } from 'react-router'
-import type { Route } from './+types/home'
-import { listDiagrams, createDiagram } from '~/db/queries'
+import { useState, useEffect, useRef } from 'react'
+import { Link, useNavigate } from 'react-router'
 import { Button } from '~/components/ui/button'
+import { Input } from '~/components/ui/input'
+import { listSheets, deleteSheet, importSheet, saveSheet } from '~/lib/persistence'
 
 export function meta() {
-  return [{ title: 'Bassline Diagrams' }]
+  return [{ title: 'Bassline Sheets' }]
 }
 
-export async function loader() {
-  const diagrams = await listDiagrams()
-  return { diagrams }
-}
+export default function Home() {
+  const [sheets, setSheets] = useState<string[]>([])
+  const [newName, setNewName] = useState('')
+  const fileRef = useRef<HTMLInputElement>(null)
+  const navigate = useNavigate()
 
-export async function action({ request }: Route.ActionArgs) {
-  const form = await request.formData()
-  const intent = form.get('intent')
+  useEffect(() => {
+    setSheets(listSheets())
+  }, [])
 
-  if (intent === 'create-diagram') {
-    const name = (form.get('name') as string) || 'Untitled'
-    const diagram = await createDiagram(name)
-    return redirect(`/diagram/${diagram.id}`)
+  const create = () => {
+    const name = newName.trim()
+    if (!name) return
+    setNewName('')
+    navigate(`/sheet/${encodeURIComponent(name)}`)
   }
 
-  return null
-}
-
-export default function Home({ loaderData }: Route.ComponentProps) {
-  const { diagrams } = loaderData
-  const fetcher = useFetcher()
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    try {
+      const sheet = await importSheet(file)
+      const name = file.name.replace(/\.json$/, '')
+      saveSheet(name, sheet)
+      setSheets(listSheets())
+      navigate(`/sheet/${encodeURIComponent(name)}`)
+    } catch (err) {
+      alert(`Import failed: ${err}`)
+    }
+  }
 
   return (
-    <div className="mx-auto max-w-2xl p-8">
-      <h1 className="mb-6 text-2xl font-bold">Diagrams</h1>
+    <div className="min-h-screen bg-background text-foreground">
+      <div className="max-w-2xl mx-auto py-16 px-4">
+        <h1 className="text-2xl font-bold mb-1">Sheets</h1>
+        <p className="text-sm text-muted-foreground mb-8">Sparse 2D coordinate planes with pointer-based values</p>
 
-      <fetcher.Form method="post" className="mb-8">
-        <input type="hidden" name="intent" value="create-diagram" />
-        <div className="flex gap-2">
-          <input
-            type="text"
-            name="name"
-            placeholder="New diagram name..."
-            className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm"
+        <div className="flex gap-2 mb-8">
+          <Input
+            value={newName}
+            onChange={e => setNewName(e.target.value)}
+            placeholder="new sheet name"
+            className="max-w-[240px]"
+            onKeyDown={e => e.key === 'Enter' && create()}
           />
-          <Button type="submit">Create</Button>
+          <Button onClick={create}>Create</Button>
+          <Button variant="outline" onClick={() => fileRef.current?.click()}>
+            Import JSON
+          </Button>
+          <input ref={fileRef} type="file" accept=".json" className="hidden" onChange={handleImport} />
         </div>
-      </fetcher.Form>
 
-      {diagrams.length === 0 ? (
-        <p className="text-muted-foreground">No diagrams yet. Create one above.</p>
-      ) : (
-        <ul className="space-y-2">
-          {diagrams.map(d => (
-            <li key={d.id}>
-              <Link
-                to={`/diagram/${d.id}`}
-                className="block rounded-lg border border-border p-4 transition-colors hover:bg-accent"
+        {sheets.length === 0 ? (
+          <div className="text-muted-foreground text-sm">No sheets yet. Create one or import a JSON file.</div>
+        ) : (
+          <div className="space-y-2">
+            {sheets.map(name => (
+              <div
+                key={name}
+                className="flex items-center justify-between p-3 border border-border rounded-md hover:bg-accent/10"
               >
-                <span className="font-medium">{d.name}</span>
-                <span className="ml-2 text-xs text-muted-foreground">{d.id.slice(0, 8)}</span>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      )}
+                <Link to={`/sheet/${encodeURIComponent(name)}`} className="font-mono text-sm hover:underline">
+                  {name}
+                </Link>
+                <Button
+                  size="xs"
+                  variant="ghost"
+                  className="text-destructive"
+                  onClick={() => {
+                    if (!confirm(`Delete sheet "${name}"?`)) return
+                    deleteSheet(name)
+                    setSheets(listSheets())
+                  }}
+                >
+                  Delete
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

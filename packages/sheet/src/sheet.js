@@ -24,6 +24,7 @@ export class SheetError extends Error {
  * Multiple cells can point to the same value (shared variables).
  * Selections name regions of the coordinate space with metadata.
  * All mutations emit messages to registered listeners.
+ * Undo/redo supported via captured prev state on each mutation.
  */
 export class Sheet {
   constructor() {
@@ -35,14 +36,16 @@ export class Sheet {
     this.selections = new Map()
     /** @type {Array<Function>} */
     this._listeners = []
+    /** @type {Array<object>} */
+    this._undoStack = []
+    /** @type {Array<object>} */
+    this._redoStack = []
+    /** @type {boolean} */
+    this._recording = true
   }
 
   // --- Events ---
 
-  /**
-   * Register a change listener. Returns unsubscribe function.
-   * @param fn
-   */
   on(fn) {
     this._listeners.push(fn)
     return () => {
@@ -50,45 +53,100 @@ export class Sheet {
     }
   }
 
-  /**
-   * @param msg
-   * @private
-   */
   _emit(msg) {
     for (const fn of this._listeners) fn(msg)
   }
 
+  _record(entry) {
+    if (!this._recording) return
+    this._undoStack.push(entry)
+    this._redoStack.length = 0
+  }
+
+  // --- Undo / Redo ---
+
+  undo() {
+    const entry = this._undoStack.pop()
+    if (!entry) return null
+    this._recording = false
+    switch (entry.op) {
+      case 'set':
+        this.cells.delete(key(entry.r, entry.c))
+        this.values.delete(entry.id)
+        this._emit({ type: 'clear', r: entry.r, c: entry.c })
+        break
+      case 'update':
+        this.values.set(entry.id, entry.prev)
+        this._emit({ type: 'update', id: entry.id, value: entry.prev })
+        break
+      case 'clear':
+        this.cells.set(key(entry.r, entry.c), entry.prevId)
+        this._emit({ type: 'link', r: entry.r, c: entry.c, id: entry.prevId })
+        break
+      case 'link': {
+        const k = key(entry.r, entry.c)
+        if (entry.prevId != null) {
+          this.cells.set(k, entry.prevId)
+          this._emit({ type: 'link', r: entry.r, c: entry.c, id: entry.prevId })
+        } else {
+          this.cells.delete(k)
+          this._emit({ type: 'clear', r: entry.r, c: entry.c })
+        }
+        break
+      }
+    }
+    this._redoStack.push(entry)
+    this._recording = true
+    return entry
+  }
+
+  redo() {
+    const entry = this._redoStack.pop()
+    if (!entry) return null
+    this._recording = false
+    switch (entry.op) {
+      case 'set':
+        this.values.set(entry.id, entry.value)
+        this.cells.set(key(entry.r, entry.c), entry.id)
+        this._emit({ type: 'set', r: entry.r, c: entry.c, id: entry.id })
+        break
+      case 'update':
+        this.values.set(entry.id, entry.value)
+        this._emit({ type: 'update', id: entry.id, value: entry.value })
+        break
+      case 'clear':
+        this.cells.delete(key(entry.r, entry.c))
+        this._emit({ type: 'clear', r: entry.r, c: entry.c })
+        break
+      case 'link':
+        this.cells.set(key(entry.r, entry.c), entry.id)
+        this._emit({ type: 'link', r: entry.r, c: entry.c, id: entry.id })
+        break
+    }
+    this._undoStack.push(entry)
+    this._recording = true
+    return entry
+  }
+
   // --- Values ---
 
-  /**
-   * Store a value, return its ID.
-   * @param value
-   */
   put(value) {
     const vid = id()
     this.values.set(vid, value)
     return vid
   }
 
-  /**
-   * Look up a value by ID.
-   * @param vid
-   */
   resolve(vid) {
     return this.values.get(vid)
   }
 
-  /**
-   * Update a value in-place. All cells pointing to it reflect the change.
-   * @param vid
-   * @param value
-   */
   update(vid, value) {
+    const prev = this.values.get(vid)
     this.values.set(vid, value)
+    this._record({ op: 'update', id: vid, value, prev })
     this._emit({ type: 'update', id: vid, value })
   }
 
-  /** Remove values not referenced by any cell. Returns collected IDs. */
   gc() {
     const referenced = new Set(this.cells.values())
     const collected = []
@@ -106,100 +164,62 @@ export class Sheet {
 
   // --- Cells ---
 
-  /**
-   * Resolve a cell to its value.
-   * @param root0
-   * @param root0."0"
-   * @param root0."1"
-   */
   get([r, c]) {
     const vid = this.cells.get(key(r, c))
     return vid != null ? this.values.get(vid) : undefined
   }
 
-  /**
-   * Get the value ID (pointer) for a cell.
-   * @param root0
-   * @param root0."0"
-   * @param root0."1"
-   */
   ref([r, c]) {
     return this.cells.get(key(r, c))
   }
 
-  /**
-   * Set a cell's value. Reuses existing value ID if cell already has one.
-   * @param root0
-   * @param root0."0"
-   * @param root0."1"
-   * @param value
-   */
   set([r, c], value) {
     const k = key(r, c)
     const existing = this.cells.get(k)
     if (existing != null) {
+      const prev = this.values.get(existing)
       this.values.set(existing, value)
+      this._record({ op: 'update', id: existing, value, prev })
       this._emit({ type: 'update', id: existing, value })
       return existing
     }
     const vid = this.put(value)
     this.cells.set(k, vid)
+    this._record({ op: 'set', r, c, id: vid, value })
     this._emit({ type: 'set', r, c, id: vid })
     return vid
   }
 
-  /**
-   * Point a cell to an existing value ID.
-   * @param root0
-   * @param root0."0"
-   * @param root0."1"
-   * @param vid
-   */
   link([r, c], vid) {
-    this.cells.set(key(r, c), vid)
+    const k = key(r, c)
+    const prevId = this.cells.get(k) ?? null
+    this.cells.set(k, vid)
+    this._record({ op: 'link', r, c, id: vid, prevId })
     this._emit({ type: 'link', r, c, id: vid })
   }
 
-  /**
-   * Remove a cell entry.
-   * @param root0
-   * @param root0."0"
-   * @param root0."1"
-   */
   clear([r, c]) {
-    this.cells.delete(key(r, c))
+    const k = key(r, c)
+    const prevId = this.cells.get(k)
+    if (prevId == null) return
+    this.cells.delete(k)
+    this._record({ op: 'clear', r, c, prevId })
     this._emit({ type: 'clear', r, c })
   }
 
   // --- Selections ---
 
-  /**
-   * Name a region with optional metadata.
-   * @param name
-   * @param region
-   */
   select(name, region) {
     this.selections.set(name, region)
     this._emit({ type: 'select', name, region })
   }
 
-  /**
-   * Get a named selection.
-   * @param name
-   */
   selection(name) {
     return this.selections.get(name)
   }
 
   // --- Iteration ---
 
-  /**
-   * Yield occupied cells in a rectangular region.
-   * @param r0
-   * @param c0
-   * @param r1
-   * @param c1
-   */
   *range(r0, c0, r1, c1) {
     for (const [k, vid] of this.cells) {
       const { r, c } = parseKey(k)
@@ -209,7 +229,6 @@ export class Sheet {
     }
   }
 
-  /** Yield all occupied cells. */
   *entries() {
     for (const [k, vid] of this.cells) {
       const { r, c } = parseKey(k)
