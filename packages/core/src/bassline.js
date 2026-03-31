@@ -11,9 +11,9 @@ export const table = {
   keys: o => (is.nil(o) ? [] : Object.keys(o)),
   values: o => (is.nil(o) ? [] : Object.values(o)),
   entries: o => (is.nil(o) ? [] : Object.entries(o)),
-  syms: o => (is.nil(o) ? [] : Object.getOwnSymbolNames(o)),
+  syms: o => (is.nil(o) ? [] : Object.getOwnPropertySymbols(o)),
   index: (table, keys) => keys.map(k => table[k]),
-  has: (table, keys) => keys.every(k => is.undefined(table[k]) === false),
+  has: (table, keys) => keys.every(k => is.defined(table[k])),
 }
 
 const isa = kind => v => kindOf(v) === kind
@@ -22,6 +22,7 @@ export const is = {
   nil: v => v == null,
   null: isa('null'),
   undefined: isa('undefined'),
+  defined: v => !is.undefined(v),
   promise: isa('promise'),
   number: isa('number'),
   string: isa('string'),
@@ -30,6 +31,14 @@ export const is = {
   array: isa('array'),
   object: isa('object'),
   msg: v => is.object(v) && Object.getPrototypeOf(v) === Object.prototype,
+}
+
+export const lazy = fn => {
+  let value, called
+  return () => {
+    if (is.undefined(called)) ((value = fn()), (called = true))
+    return value
+  }
 }
 
 export const delay = async (ms = 1000) => await new Promise(res => setTimeout(res, ms))
@@ -46,8 +55,6 @@ export class Fault extends Error {
   }
 }
 export const fault = (condition, msg, context) => new Fault(condition, msg, context)
-
-// ~~~~~~~~~~~~~~~~ Hello Bassline :) ~~~~~~~~~~~~~~~~
 export function port(size = Infinity) {
   const buffer = []
   const waiters = []
@@ -73,28 +80,25 @@ export function port(size = Infinity) {
 }
 
 export function propagator(fn = (v, p) => p(v)) {
-  const targets = new Set()
   let closed = false
-  const propagate = value => targets.forEach(t => t(value))
+  const targets = lazy(() => new Set())
+  const propagate = value => targets().forEach(t => t(value))
   async function send(value) {
     if (closed) return
     await fn(value, propagate)
   }
   function to(...dests) {
-    dests.forEach(d => targets.add(d))
-    return () => dests.forEach(d => targets.delete(d))
+    dests.forEach(d => targets().add(d))
+    return () => dests.forEach(d => targets().delete(d))
   }
   function close() {
     closed = true
-    targets.clear()
+    targets().clear()
   }
   return { send, to, close }
 }
 
-function defaultCell(current, incoming, update) {
-  if (current !== incoming) update(incoming)
-}
-export function cell(merge = defaultCell, init = undefined) {
+export function cell(merge, init) {
   let current = init
   const { send, to, close } = propagator((incoming, propagate) => {
     merge(current, incoming, value => {
@@ -157,7 +161,6 @@ export function clock(ms = 1000, eager = true) {
     },
   }
 }
-// ~~~~~~~~~~~~~~~~ Fin Communications ~~~~~~~~~~~~~~~~
 
 export function message(content) {
   if (is.undefined(content)) return {}
