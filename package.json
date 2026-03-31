@@ -41,23 +41,28 @@
       "flatted": ">=3.4.0",
       "lodash": ">=4.17.23",
       "markdown-it": ">=14.1.1"
-    }
+    },
+    "onlyBuiltDependencies": [
+      "electron",
+      "esbuild",
+      "msw"
+    ]
   },
   "devDependencies": {
-    "@eslint/js": "^9.39.1",
-    "@fast-check/vitest": "^0.2.4",
-    "@types/node": "^25.0.3",
-    "@types/react": "^19.1.13",
+    "@eslint/js": "^9.39.4",
+    "@fast-check/vitest": "^0.3.0",
+    "@types/node": "^25.5.0",
+    "@types/react": "^19.2.14",
     "eslint": "^9.39.4",
     "eslint-config-prettier": "^10.1.8",
-    "eslint-plugin-jsdoc": "^61.5.0",
+    "eslint-plugin-jsdoc": "^61.7.1",
     "husky": "^9.1.7",
     "jsdoc": "^4.0.5",
-    "knip": "^5.73.3",
-    "lint-staged": "^16.2.7",
-    "prettier": "^3.7.4",
-    "typescript": "^5.3.3",
-    "vitest": "^4.1.0",
-    "ws": "^8.19.0"
+    "knip": "^5.88.1",
+    "lint-staged": "^16.4.0",
+    "prettier": "^3.8.1",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.2",
+    "ws": "^8.20.0"
   }
 }

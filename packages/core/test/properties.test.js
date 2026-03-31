@@ -1,8 +1,6 @@
 import { test, expect } from 'vitest'
 import { fc, it } from '@fast-check/vitest'
-import { message, update, isEmpty } from '../src/messages.js'
-import { port, consume, isEOF, cell } from '../src/comm.js'
-import { isPlainObject } from '../src/utils.js'
+import { message, port, consume, is, cell } from '../src/bassline.js'
 
 async function collect(recv) {
   const c = cell((current, incoming, update) => update([...current, incoming]), [])
@@ -35,36 +33,6 @@ it.prop([plainObject])('message idempotence — normalizing twice equals normali
   expect(twice).toEqual(once)
 })
 
-it.prop([plainObject])('isEmpty matches Object.keys length', obj => {
-  expect(isEmpty(obj)).toBe(Object.keys(obj).length === 0)
-})
-
-// --- update properties ---
-
-it.prop([plainObject])('update curried and direct forms are equivalent', obj => {
-  const fn = () => ({ tagged: true })
-  expect(update(obj, fn)).toEqual(update(fn)(obj))
-})
-
-const updateFn = fc.array(fc.tuple(fc.string(), fc.jsonValue()), { maxLength: 5 }).map(pairs => {
-  const result = Object.fromEntries(pairs)
-  return () => result
-})
-
-it.prop([plainObject, updateFn])('update curried and direct forms equivalent with arbitrary fns', (obj, fn) => {
-  expect(update(obj, fn)).toEqual(update(fn)(obj))
-})
-
-it.prop([plainObject])('update with fn returning undefined is a copy', obj => {
-  const result = update(obj, () => undefined)
-  expect(result).toEqual({})
-})
-
-it.prop([fc.anything(), updateFn])('update always returns a message', (obj, fn) => {
-  const result = update(obj, fn)
-  expect(isPlainObject(result)).toBe(true)
-})
-
 // --- port order preservation ---
 
 it.prop([fc.array(fc.anything(), { minLength: 0, maxLength: 50 })])(
@@ -72,12 +40,12 @@ it.prop([fc.array(fc.anything(), { minLength: 0, maxLength: 50 })])(
   async values => {
     const p = port()
     for (const v of values) {
-      if (isEOF(v)) continue
+      if (is.eof(v)) continue
       p.send(v)
     }
     p.close()
     const result = await collect(p.recv)
-    const expected = values.filter(v => !isEOF(v))
+    const expected = values.filter(v => !is.eof(v))
     expect(result.length).toBe(expected.length)
     for (let i = 0; i < expected.length; i++) {
       expect(Object.is(result[i], expected[i])).toBe(true)

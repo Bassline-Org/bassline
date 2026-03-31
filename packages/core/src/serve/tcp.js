@@ -1,6 +1,6 @@
 import nodeNet from 'node:net'
 import { fromSocket } from '../transports/socket.js'
-import { port } from '../comm.js'
+import { port } from '../bassline.js'
 
 export function serve(options = {}, frame) {
   const p = port()

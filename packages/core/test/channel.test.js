@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { port, net, clock, consume, EOF, isEOF, propagator, cell } from '../src/comm.js'
+import { port, net, consume, EOF, is, propagator, cell } from '../src/bassline.js'
 
 async function collect(recv) {
   const c = cell((current, incoming, update) => update([...current, incoming]), [])
@@ -145,26 +145,6 @@ describe('net', () => {
   })
 })
 
-describe('clock', () => {
-  it('emits timestamps', async () => {
-    const c = clock(10)
-    const msg = await c.recv()
-    expect(isEOF(msg)).toBe(false)
-    expect(msg.ts).toBeTypeOf('number')
-    c.close()
-  })
-
-  it('close produces EOF after draining buffer', async () => {
-    const c = clock(10)
-    c.close()
-    // first recv drains the initial tick
-    const first = await c.recv()
-    expect(isEOF(first)).toBe(false)
-    // second recv gets EOF
-    expect(await c.recv()).toBe(EOF)
-  })
-})
-
 describe('consume', () => {
   it('processes all messages until EOF', async () => {
     const p = port()
@@ -194,14 +174,14 @@ describe('consume', () => {
 
 describe('isEOF', () => {
   it('returns true for EOF', () => {
-    expect(isEOF(EOF)).toBe(true)
+    expect(is.eof(EOF)).toBe(true)
   })
 
   it('returns false for other values', () => {
-    expect(isEOF(null)).toBe(false)
-    expect(isEOF(undefined)).toBe(false)
-    expect(isEOF(42)).toBe(false)
-    expect(isEOF(Symbol())).toBe(false)
+    expect(is.eof(null)).toBe(false)
+    expect(is.eof(undefined)).toBe(false)
+    expect(is.eof(42)).toBe(false)
+    expect(is.eof(Symbol())).toBe(false)
   })
 })
 

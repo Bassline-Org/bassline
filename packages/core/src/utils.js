@@ -24,9 +24,7 @@ export const delay = async (ms = 1000) => {
   await new Promise(res => setTimeout(res, ms))
   return
 }
-
 export const castArr = value => (isArray(value) ? value : [value])
-
 export const keys = o => (isNil(o) ? [] : Object.keys(o))
 export const values = o => (isNil(o) ? [] : Object.values(o))
 export const syms = o => (isNil(o) ? [] : Object.getOwnSymbolNames(o))

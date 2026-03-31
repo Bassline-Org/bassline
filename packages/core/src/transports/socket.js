@@ -1,5 +1,5 @@
 import net from 'node:net'
-import { port } from '../comm.js'
+import { port } from '../bassline.js'
 import defaultFrame from '../frame/jsonl.js'
 
 export function fromSocket(socket, frame = defaultFrame) {

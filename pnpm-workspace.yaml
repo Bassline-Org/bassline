@@ -1,5 +1,5 @@
 packages:
-  - apps/visual
+  #- apps/visual
   - packages/core
   - packages/ontology
   - packages/crypto

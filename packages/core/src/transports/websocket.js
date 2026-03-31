@@ -1,5 +1,4 @@
-import { port } from '../comm.js'
-import { message } from '../messages.js'
+import { port, message } from '../bassline.js'
 
 export function fromWebSocket(ws) {
   const p = port()

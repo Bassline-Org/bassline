@@ -1,5 +1,5 @@
 import { fromWebSocket } from '../transports/websocket.js'
-import { port } from '../comm.js'
+import { port } from '../bassline.js'
 
 export function serve(wss) {
   const p = port()

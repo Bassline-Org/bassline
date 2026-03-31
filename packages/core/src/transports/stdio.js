@@ -1,5 +1,5 @@
 import readline from 'node:readline'
-import { port } from '../comm.js'
+import { port } from '../bassline.js'
 import defaultFrame from '../frame/jsonl.js'
 
 export function fromStdio(frame = defaultFrame) {
