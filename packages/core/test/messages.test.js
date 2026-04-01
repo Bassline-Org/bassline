@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { message, Fault, fault } from '../src/bassline.js'
+import { message, kindOf } from '../src/bassline.js'
 
 describe('message', () => {
   it('normalizes undefined to empty object', () => {
@@ -34,45 +34,28 @@ describe('message', () => {
   })
 })
 
-describe('Fault', () => {
-  it('is an instance of Error', () => {
-    const f = new Fault('not-found', { path: '/x' })
-    expect(f).toBeInstanceOf(Error)
+describe('kindOf', () => {
+  it('distinguishes null from undefined', () => {
+    expect(kindOf(null)).toBe('null')
+    expect(kindOf(undefined)).toBe('undefined')
   })
 
-  it('carries condition, msg, and context', () => {
-    const f = new Fault('timeout', { id: 1 }, { elapsed: 5000 })
-    expect(f.condition).toBe('timeout')
-    expect(f.msg).toEqual({ id: 1 })
-    expect(f.context).toEqual({ elapsed: 5000 })
+  it('identifies promises', () => {
+    expect(kindOf(Promise.resolve())).toBe('promise')
+    expect(kindOf(new Promise(() => {}))).toBe('promise')
   })
 
-  it('has a descriptive error message', () => {
-    const f = new Fault('bad-input', {})
-    expect(f.message).toBe('fault: bad-input')
+  it('identifies arrays (not object)', () => {
+    expect(kindOf([])).toBe('array')
+    expect(kindOf([1, 2, 3])).toBe('array')
   })
 
-  it('defaults context to empty object', () => {
-    const f = new Fault('oops', {})
-    expect(f.context).toEqual({})
-  })
-})
-
-describe('fault', () => {
-  it('throws a Fault', () => {
-    expect(() => {
-      throw fault('boom', { x: 1 })
-    }).toThrow(Fault)
-  })
-
-  it('thrown Fault has correct fields', () => {
-    expect.assertions(3)
-    try {
-      throw fault('boom', { x: 1 }, { retry: true })
-    } catch (e) {
-      expect(e.condition).toBe('boom')
-      expect(e.msg).toEqual({ x: 1 })
-      expect(e.context).toEqual({ retry: true })
-    }
+  it('falls through to typeof for everything else', () => {
+    expect(kindOf(42)).toBe('number')
+    expect(kindOf('hello')).toBe('string')
+    expect(kindOf(true)).toBe('boolean')
+    expect(kindOf(Symbol())).toBe('symbol')
+    expect(kindOf(() => {})).toBe('function')
+    expect(kindOf({})).toBe('object')
   })
 })

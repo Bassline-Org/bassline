@@ -7,15 +7,6 @@ export function kindOf(v) {
   return typeof v
 }
 
-export const table = {
-  keys: o => (is.nil(o) ? [] : Object.keys(o)),
-  values: o => (is.nil(o) ? [] : Object.values(o)),
-  entries: o => (is.nil(o) ? [] : Object.entries(o)),
-  syms: o => (is.nil(o) ? [] : Object.getOwnPropertySymbols(o)),
-  index: (table, keys) => keys.map(k => table[k]),
-  has: (table, keys) => keys.every(k => is.defined(table[k])),
-}
-
 const isa = kind => v => kindOf(v) === kind
 export const is = {
   eof: v => v === EOF,
@@ -41,37 +32,27 @@ export const lazy = fn => {
   }
 }
 
-export const delay = async (ms = 1000) => await new Promise(res => setTimeout(res, ms))
-
-export class Fault extends Error {
-  constructor(condition, msg, context = {}) {
-    super(`fault: ${condition}`)
-    this.condition = condition
-    this.msg = msg
-    this.context = context
-  }
-  toMessage() {
-    return message({ condition: this.condition, msg: this.msg, ...this.context })
-  }
-}
-export const fault = (condition, msg, context) => new Fault(condition, msg, context)
+export const delay = (ms = 1000) => new Promise(res => setTimeout(res, ms))
 export function port(size = Infinity) {
-  const buffer = []
-  const waiters = []
+  const buffer = [],
+    waiters = []
   let closed = false
-  const close = () => {
+  function close() {
     closed = true
     for (const w of waiters) w(EOF)
     waiters.length = 0
   }
-  const send = msg => {
+  function send(msg) {
     if (is.eof(msg)) throw new Error('Bassline EOF is reserved')
     if (closed) return
+    // resolve the promise if we have a waiter
     if (waiters.length > 0) return waiters.shift()(msg)
-    if (buffer.length >= size) buffer.shift() // sliding buffer
-    if (size > 0) buffer.push(msg) // no buffer
+    // drop a message if we are over capabity
+    if (buffer.length >= size) buffer.shift()
+    // add the message to the buffer if we have capacity
+    if (size > 0) buffer.push(msg)
   }
-  const recv = () => {
+  function recv() {
     if (buffer.length > 0) return Promise.resolve(buffer.shift())
     if (closed) return Promise.resolve(EOF)
     return new Promise(resolve => waiters.push(resolve))
@@ -125,41 +106,22 @@ export function consume(recv, callback) {
 export function net() {
   const ports = new Set()
   function join(size) {
-    const p = port(size)
-    let closed = false
-    ports.add(p)
-    const send = msg => {
-      if (closed) return
-      ports.forEach(port => port !== p && port.send(msg))
-    }
-    const close = () => {
-      closed = true
-      ports.delete(p)
-      p.close()
-    }
-
+    const fromNet = port(size)
+    ports.add(fromNet)
     return {
-      recv: p.recv,
-      send,
-      close,
+      recv: fromNet.recv,
+      send(msg) {
+        ports.forEach(p => p !== fromNet && p.send(msg))
+      },
+      close() {
+        fromNet.close()
+        ports.delete(fromNet)
+      },
     }
   }
   join.close = () => [...ports].forEach(p => p.close())
   join.send = msg => [...ports].forEach(p => p.send(msg))
   return join
-}
-
-export function clock(ms = 1000, eager = true) {
-  const { send, to, close } = propagator((_, p) => p({ ts: Date.now() }))
-  const interval = setInterval(send, ms)
-  if (eager) send({})
-  return {
-    to,
-    close: () => {
-      clearInterval(interval)
-      close()
-    },
-  }
 }
 
 export function message(content) {
@@ -168,19 +130,10 @@ export function message(content) {
   return { body: content }
 }
 
-export const hasCap = (msg, name) => table.has(msg, [name]) && is.fn(msg[name])
-
-function assertHandlers(handlers) {
-  const syms = table.syms(handlers)
-  for (const sym of syms) {
-    if (!is.symbol(sym)) throw new Error('invalid handler key, must be a symbol!')
-    if (!is.fn(handlers[sym])) throw new Error('invalid handler,  must be a function')
-  }
-  return syms
-}
+export const hasCap = (msg, name) => is.defined(msg[name]) && is.fn(msg[name])
 
 export function offer(handlers) {
-  const syms = assertHandlers(handlers)
+  const syms = Object.getOwnPropertySymbols(handlers)
   return propagator((msg, propagate) => {
     const enriched = { ...msg }
     for (const sym of syms) {
@@ -191,7 +144,7 @@ export function offer(handlers) {
 }
 
 export function accept(handlers) {
-  const syms = assertHandlers(handlers)
+  const syms = Object.getOwnPropertySymbols(handlers)
   return propagator(async (msg, propagate) => {
     for (const sym of syms) {
       if (hasCap(msg, sym)) await handlers[sym](msg, msg[sym])

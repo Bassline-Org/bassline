@@ -19,6 +19,5 @@
   "scripts": {
     "test": "vitest run"
   },
-  "license": "AGPL-3.0",
-  "dependencies": {}
+  "license": "AGPL-3.0"
 }
