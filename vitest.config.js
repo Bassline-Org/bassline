@@ -3,6 +3,9 @@ import { defineConfig } from 'vitest/config'
 export default defineConfig({
   test: {
     globals: true,
+    coverage: {
+      provider: 'v8'
+    },
     environment: 'node',
     // Test organization by type
     // Run all: pnpm test

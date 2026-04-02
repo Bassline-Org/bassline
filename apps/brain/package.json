@@ -1,19 +1,15 @@
 {
-  "name": "brain",
-  "description": "description",
+  "name": "@bassline/brain-example",
+  "description": "An example project using @bassline/brain",
   "version": "1.0.0",
   "type": "module",
   "author": "goose",
   "scripts": {
-    "dev": "vite"
+    "brain:edit": "brain edit",
+    "brain:run": "brain run"
   },
   "dependencies": {
     "@bassline/core": "workspace:*",
-    "cytoscape": "^3.31.0",
-    "cytoscape-cxtmenu": "^3.5.0",
-    "cytoscape-edgehandles": "^4.0.1"
-  },
-  "devDependencies": {
-    "vite": "^6.0.0"
+    "@bassline/brain": "workspace:*"
   }
 }

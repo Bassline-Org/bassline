@@ -5,6 +5,14 @@ import cxtmenu from 'cytoscape-cxtmenu'
 cytoscape.use(edgehandles)
 cytoscape.use(cxtmenu)
 
+function typeColor(type) {
+  if (!type) return '#4a6670'
+  let hash = 0
+  for (let i = 0; i < type.length; i++) hash = type.charCodeAt(i) + ((hash << 5) - hash)
+  const h = ((hash % 360) + 360) % 360
+  return `hsl(${h}, 35%, 35%)`
+}
+
 export const graphName = () => location.hash.slice(1) || null
 
 export const cy = cytoscape({
@@ -14,8 +22,13 @@ export const cy = cytoscape({
     {
       selector: 'node',
       style: {
-        'background-color': '#4a6670',
-        'label': 'data(label)',
+        'background-color': (ele) => typeColor(ele.data('type')),
+        'label': (ele) => {
+          const label = ele.data('label') || ''
+          const type = ele.data('type') || ''
+          return type ? `${label}\n(${type})` : label
+        },
+        'text-wrap': 'wrap',
         'color': '#e0e0e0',
         'text-valign': 'center',
         'text-halign': 'center',
@@ -24,6 +37,20 @@ export const cy = cytoscape({
         'height': 50,
         'border-width': 2,
         'border-color': '#6a8a96',
+      },
+    },
+    {
+      selector: 'node[?live]',
+      style: {
+        'border-style': 'solid',
+        'opacity': 1,
+      },
+    },
+    {
+      selector: 'node[!live]',
+      style: {
+        'border-style': 'dashed',
+        'opacity': 0.6,
       },
     },
     {

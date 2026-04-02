@@ -1,0 +1,17 @@
+{
+  "name": "@bassline/brain",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/build.js"
+  },
+  "bin": {
+    "brain": "./bin/brain.js"
+  },
+  "dependencies": {
+    "cytoscape": "^3.31.0",
+    "cytoscape-cxtmenu": "^3.5.0",
+    "cytoscape-edgehandles": "^4.0.1",
+    "vite": "^6.0.0"
+  }
+}

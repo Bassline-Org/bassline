@@ -1,7 +1,5 @@
 import { cy, eh, save } from './graph.js'
 
-const uid = () => crypto.randomUUID()
-
 // --- Ctrl+drag to draw edges ---
 
 cy.on('tapstart', 'node', (e) => {
@@ -23,9 +21,8 @@ cy.cxtmenu({
     {
       content: 'Add Node',
       select: (_, ev) => {
-        const id = uid()
         cy.add({
-          data: { id, label: id },
+          data: { id: crypto.randomUUID(), label: '', type: '', live: true },
           position: ev.position,
         })
       },
@@ -43,8 +40,32 @@ cy.cxtmenu({
     {
       content: 'Rename',
       select: (ele) => {
-        const name = prompt('Name:', ele.data('label'))
+        const name = prompt('Label:', ele.data('label'))
         if (name != null) ele.data('label', name)
+      },
+    },
+    {
+      content: 'Set Type',
+      select: (ele) => {
+        const type = prompt('Type:', ele.data('type'))
+        if (type != null) ele.data('type', type)
+      },
+    },
+    {
+      content: 'Toggle Live',
+      select: (ele) => ele.data('live', !ele.data('live')),
+    },
+    {
+      content: 'Edit Data',
+      select: (ele) => {
+        const json = prompt('Data (JSON):', JSON.stringify(ele.data()))
+        if (json == null) return
+        try {
+          const data = JSON.parse(json)
+          ele.data(data)
+        } catch (e) {
+          alert('Invalid JSON')
+        }
       },
     },
     {
