@@ -3,7 +3,7 @@
 "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
-<!-- 2026-03-25 Wed 15:28 -->
+<!-- 2026-03-30 Mon 21:25 -->
 <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Bassline V2</title>
@@ -21,50 +21,35 @@
 <h2>Table of Contents</h2>
 <div id="text-table-of-contents" role="doc-toc">
 <ul>
-<li><a href="#orgbbf12fa">1. <span class="todo TODO">TODO</span> Update the transports &amp; frame fault story</a></li>
-<li><a href="#org93e569b">2. Introduction</a>
+<li><a href="#org2cd89ad">1. Introduction</a>
 <ul>
-<li><a href="#org91c8f60">2.1. TLDR</a></li>
+<li><a href="#org6c22cae">1.1. TLDR</a></li>
 </ul>
 </li>
-<li><a href="#org4ac0356">3. The Kernel</a>
+<li><a href="#org58b9d9f">2. The Kernel</a>
 <ul>
-<li><a href="#org3feac15">3.1. Communication</a></li>
-<li><a href="#org0e1fca3">3.2. Messages</a></li>
+<li><a href="#org2523404">2.1. Communication</a></li>
+<li><a href="#orgc872392">2.2. Messages</a></li>
 </ul>
 </li>
-<li><a href="#org1115bb4">4. Transports</a>
+<li><a href="#orgccc7ba8">3. Transports</a>
 <ul>
-<li><a href="#org8f517b2">4.1. Abstractly</a></li>
-<li><a href="#org4906d6d">4.2. Concretely</a></li>
+<li><a href="#org5476222">3.1. Abstractly</a></li>
+<li><a href="#org29539a1">3.2. Concretely</a></li>
 </ul>
 </li>
-<li><a href="#org2f80d0c">5. Deployment (Draft)</a>
+<li><a href="#org02bb93d">4. Utilities</a></li>
+<li><a href="#orgc2a7573">5. Items left to finish up</a>
 <ul>
-<li><a href="#orgfb045b9">5.1. Abstractly</a></li>
-<li><a href="#org0bdc687">5.2. Concretely</a></li>
-</ul>
-</li>
-<li><a href="#orga459321">6. Utilities</a>
-<ul>
-<li><a href="#org2005de5">6.1. Type Predicates</a></li>
-<li><a href="#org59d24b0">6.2. Misc</a></li>
+<li><a href="#org34448ff">5.1. <span class="todo TODO">TODO</span> Update the transports &amp; frame fault story</a></li>
 </ul>
 </li>
 </ul>
 </div>
 </div>
-<div id="outline-container-orgbbf12fa" class="outline-2">
-<h2 id="orgbbf12fa"><span class="section-number-2">1.</span> <span class="todo TODO">TODO</span> Update the transports &amp; frame fault story</h2>
+<div id="outline-container-org2cd89ad" class="outline-2">
+<h2 id="org2cd89ad"><span class="section-number-2">1.</span> Introduction</h2>
 <div class="outline-text-2" id="text-1">
-<p>
-I need to cleanup the fault handling story there.
-</p>
-</div>
-</div>
-<div id="outline-container-org93e569b" class="outline-2">
-<h2 id="org93e569b"><span class="section-number-2">2.</span> Introduction</h2>
-<div class="outline-text-2" id="text-2">
 <p>
 This literate document contains the source code for the core of <a href="https://bassline.dev">Bassline</a> v2.
 </p>
@@ -73,9 +58,9 @@ This literate document contains the source code for the core of <a href="https:/
 Bassline is designed to be hacked on and modified, so we encourage people to read this!
 </p>
 </div>
-<div id="outline-container-org91c8f60" class="outline-3">
-<h3 id="org91c8f60"><span class="section-number-3">2.1.</span> TLDR</h3>
-<div class="outline-text-3" id="text-2-1">
+<div id="outline-container-org6c22cae" class="outline-3">
+<h3 id="org6c22cae"><span class="section-number-3">1.1.</span> TLDR</h3>
+<div class="outline-text-3" id="text-1-1">
 <p>
 Bassline is a system for partial information programming.
 </p>
@@ -103,9 +88,9 @@ New message shapes, participants, and behavior do not require a separate extensi
 </div>
 </div>
 </div>
-<div id="outline-container-org4ac0356" class="outline-2">
-<h2 id="org4ac0356"><span class="section-number-2">3.</span> The Kernel</h2>
-<div class="outline-text-2" id="text-3">
+<div id="outline-container-org58b9d9f" class="outline-2">
+<h2 id="org58b9d9f"><span class="section-number-2">2.</span> The Kernel</h2>
+<div class="outline-text-2" id="text-2">
 <p>
 The kernel starts with messages and a local capability for communication.
 In this book that capability is implemented with ports, a minimal set of capabilities for communication.
@@ -118,13 +103,13 @@ The abstract layer explains what shape of thing we are modeling.
 The concrete layer shows one minimal JavaScript realization of that shape.
 </p>
 </div>
-<div id="outline-container-org3feac15" class="outline-3">
-<h3 id="org3feac15"><span class="section-number-3">3.1.</span> Communication</h3>
-<div class="outline-text-3" id="text-3-1">
+<div id="outline-container-org2523404" class="outline-3">
+<h3 id="org2523404"><span class="section-number-3">2.1.</span> Communication</h3>
+<div class="outline-text-3" id="text-2-1">
 </div>
-<div id="outline-container-org7ac5186" class="outline-4">
-<h4 id="org7ac5186"><span class="section-number-4">3.1.1.</span> Abstractly</h4>
-<div class="outline-text-4" id="text-3-1-1">
+<div id="outline-container-org8a1bada" class="outline-4">
+<h4 id="org8a1bada"><span class="section-number-4">2.1.1.</span> Abstractly</h4>
+<div class="outline-text-4" id="text-2-1-1">
 <p>
 Communication is the local capability to receive new information and contribute new information.
 Bassline treats communication as an ongoing process in which participants coordinate by processing messages and inferring enough structure from what they know to continue.
@@ -135,9 +120,9 @@ Communication needs a shape that preserves decoupling. Producers should be able 
 </p>
 </div>
 </div>
-<div id="outline-container-orgcbc7195" class="outline-4">
-<h4 id="orgcbc7195"><span class="section-number-4">3.1.2.</span> Concretely</h4>
-<div class="outline-text-4" id="text-3-1-2">
+<div id="outline-container-orgb783c42" class="outline-4">
+<h4 id="orgb783c42"><span class="section-number-4">2.1.2.</span> Concretely</h4>
+<div class="outline-text-4" id="text-2-1-2">
 <p>
 In this book, communication is implemented as ports.
 </p>
@@ -187,8 +172,8 @@ This ensures neither side requires knowledge of the other&rsquo;s state / status
 </p>
 </div>
 <ol class="org-ol">
-<li><a id="org5e2c3d7"></a>Port implementation<br />
-<div class="outline-text-5" id="text-3-1-2-1">
+<li><a id="org895ffd9"></a>Port implementation<br />
+<div class="outline-text-5" id="text-2-1-2-1">
 <p>
 The port implementation is rather simple.
 </p>
@@ -216,8 +201,7 @@ It should only be created internally inside of a port to notify a local consumer
 </p>
 
 <div class="org-src-container">
-<pre class="src src-js"><span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">EOF</span> = Symbol.<span style="color: #5EC4FF;">for</span>(<span style="color: #539AFC;">'$$BASSLINE_EOF$$'</span>)
-<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">isEOF</span> = v =&gt; v === EOF
+<pre class="src src-js">&lt;&lt;utils-omitted&gt;&gt;
 <span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">function</span> port(<span style="color: #718CA1;">size</span> = <span style="color: #E27E8D;">Infinity</span>) {
   <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">buffer</span> = []
   <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">waiters</span> = []
@@ -228,7 +212,7 @@ It should only be created internally inside of a port to notify a local consumer
     waiters.length = <span style="color: #E27E8D; font-weight: bold;">0</span>
   }
   <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">send</span> = msg =&gt; {
-    <span style="color: #5EC4FF;">if</span> (isEOF(msg)) <span style="color: #5EC4FF;">throw</span> <span style="color: #5EC4FF;">new</span> <span style="color: #a9a9a9; font-weight: bold;">Error</span>(<span style="color: #539AFC;">'Bassline EOF is reserved'</span>)
+    <span style="color: #5EC4FF;">if</span> (is.eof(msg)) <span style="color: #5EC4FF;">throw</span> <span style="color: #5EC4FF;">new</span> <span style="color: #a9a9a9; font-weight: bold;">Error</span>(<span style="color: #539AFC;">'Bassline EOF is reserved'</span>)
     <span style="color: #5EC4FF;">if</span> (closed) <span style="color: #5EC4FF;">return</span>
     <span style="color: #5EC4FF;">if</span> (waiters.length &gt; <span style="color: #E27E8D; font-weight: bold;">0</span>) <span style="color: #5EC4FF;">return</span> waiters.shift()(msg)
     <span style="color: #5EC4FF;">if</span> (buffer.length &gt;= size) buffer.shift() <span style="color: #41505E; font-style: italic;">// </span><span style="color: #41505E; font-style: italic;">sliding buffer</span>
@@ -245,41 +229,103 @@ It should only be created internally inside of a port to notify a local consumer
 </div>
 </div>
 </li>
-<li><a id="orgd228b98"></a>Using a port<br />
-<div class="outline-text-5" id="text-3-1-2-2">
+<li><a id="org14828a4"></a>Port usage<br />
+<ol class="org-ol">
+<li><a id="orgf19710a"></a>Propagator<br />
+<div class="outline-text-6" id="text-2-1-2-2-1">
 <p>
-The most common way to use a port, is inside of an endless async loop that exists when we recv EOF.
+A propagator let&rsquo;s us define something that can selectively propagate interesting messages to multiple targets.
 </p>
 
 <p>
-We define a helper for this called <code>consume</code>. It let&rsquo;s us build actor-like processes from our ports, and is convenient.
-</p>
-
-<p>
-If you need to define more sophisticated control flow inside of the loop, just write the extra 3 lines. :)
+Cycles are supported and encouraged, just make sure you correctly setup your propagators to ignore irrelevant information.
 </p>
 
 <div class="org-src-container">
-<pre class="src src-js"><span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">async</span> <span style="color: #5EC4FF;">function</span> consume(<span style="color: #718CA1;">recv</span>, <span style="color: #718CA1;">callback</span>) {
-  <span style="color: #5EC4FF;">let</span> <span style="color: #718CA1;">msg</span>
-  <span style="color: #5EC4FF;">while</span> (<span style="color: #E27E8D;">true</span>) {
-    msg = <span style="color: #5EC4FF;">await</span> recv()
-    <span style="color: #5EC4FF;">if</span> (isEOF(msg)) <span style="color: #5EC4FF;">break</span>
-    <span style="color: #5EC4FF;">await</span> callback(msg)
+<pre class="src src-js"><span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">function</span> propagator(<span style="color: #718CA1;">fn</span> = (<span style="color: #718CA1;">v</span>, <span style="color: #718CA1;">p</span>) =&gt; p(v)) {
+  <span style="color: #5EC4FF;">let</span> <span style="color: #718CA1;">closed</span> = <span style="color: #E27E8D;">false</span>
+  <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">targets</span> = lazy(() =&gt; <span style="color: #5EC4FF;">new</span> <span style="color: #a9a9a9; font-weight: bold;">Set</span>())
+  <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">propagate</span> = value =&gt; targets().forEach(t =&gt; t(value))
+  <span style="color: #5EC4FF;">async</span> <span style="color: #5EC4FF;">function</span> send(<span style="color: #718CA1;">value</span>) {
+    <span style="color: #5EC4FF;">if</span>(closed) <span style="color: #5EC4FF;">return</span>
+    <span style="color: #5EC4FF;">await</span> fn(value, propagate)
   }
+  <span style="color: #5EC4FF;">function</span> <span style="color: #33CED8;">to</span>(...dests) {
+    dests.forEach(d =&gt; targets().add(d))
+    <span style="color: #5EC4FF;">return</span> () =&gt; dests.forEach(d =&gt; targets().<span style="color: #5EC4FF;">delete</span>(d))
+  }
+  <span style="color: #5EC4FF;">function</span> <span style="color: #33CED8;">close</span>() {
+    closed = <span style="color: #E27E8D;">true</span>
+    targets().clear()
+  }
+  <span style="color: #5EC4FF;">return</span> { send, to, close }
 }
 </pre>
 </div>
 </div>
 </li>
-<li><a id="org95d0d3c"></a>Nets<br />
-<div class="outline-text-5" id="text-3-1-2-3">
+<li><a id="orgbeef294"></a>Cell<br />
+<div class="outline-text-6" id="text-2-1-2-2-2">
 <p>
-Now our ports look like &ldquo;point-to-point&rdquo; communication, however in Bassline we don&rsquo;t talk to &ldquo;something&rdquo;, we observe information from our perspective.
+A propagator with state
+</p>
+
+<div class="org-src-container">
+<pre class="src src-js"><span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">function</span> cell(<span style="color: #718CA1;">merge</span>, <span style="color: #718CA1;">init</span>) {
+  <span style="color: #5EC4FF;">let</span> <span style="color: #718CA1;">current</span> = init
+  <span style="color: #5EC4FF;">const</span> {send, to, close} = propagator((incoming, propagate) =&gt; {
+    merge(current, incoming, value =&gt; {
+      current = value
+      propagate(value)
+    })
+  })
+  <span style="color: #5EC4FF;">return</span> { send, to, close, value: () =&gt; current }
+}
+</pre>
+</div>
+</div>
+</li>
+<li><a id="orgc63ac47"></a>Consume<br />
+<div class="outline-text-6" id="text-2-1-2-2-3">
+<p>
+The most common way to use a port, is inside of an endless async loop that exists when we recv EOF.
+</p>
+
+<p>
+We define a helper for this called <code>consume</code>. It let&rsquo;s us use a recv fn to manage the inputs for a propagator, as well
+as it&rsquo;s lifecycle.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-js"><span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">function</span> consume(<span style="color: #718CA1;">recv</span>, <span style="color: #718CA1;">callback</span>) {
+  <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">p</span> = propagator(callback)
+  <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">promise</span> = (<span style="color: #5EC4FF;">async</span> () =&gt; {
+    <span style="color: #5EC4FF;">while</span> (<span style="color: #E27E8D;">true</span>) {
+      <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">msg</span> = <span style="color: #5EC4FF;">await</span> recv()
+      <span style="color: #5EC4FF;">if</span> (is.eof(msg)) <span style="color: #5EC4FF;">break</span>
+      <span style="color: #5EC4FF;">await</span> p.send(msg)
+    }
+    p.close()
+  })()
+  <span style="color: #5EC4FF;">return</span> { to: p.to, promise }
+}
+</pre>
+</div>
+</div>
+</li>
+</ol>
+</li>
+<li><a id="org769c3c8"></a>Nets<br />
+<div class="outline-text-5" id="text-2-1-2-3">
+<p>
+Current our ports look like &ldquo;point-to-point&rdquo; communication, however in Bassline we don&rsquo;t talk to &ldquo;something&rdquo;, we observe information from our perspective, and send through opaque handles.
 </p>
 
 <p>
 This let&rsquo;s us do some neat things when it comes to communication.
+</p>
+
+<p>
 For example, a common structure we use is a <code>net</code>.
 </p>
 
@@ -296,7 +342,6 @@ This highlights that in bassline cooperating participants appear as a single par
 <div class="org-src-container">
 <pre class="src src-js"><span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">function</span> net() {
   <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">ports</span> = <span style="color: #5EC4FF;">new</span> <span style="color: #a9a9a9; font-weight: bold;">Set</span>()
-
   <span style="color: #5EC4FF;">function</span> <span style="color: #33CED8;">join</span>(<span style="color: #718CA1;">size</span>) {
     <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">p</span> = port(size)
     <span style="color: #5EC4FF;">let</span> <span style="color: #718CA1;">closed</span> = <span style="color: #E27E8D;">false</span>
@@ -325,8 +370,8 @@ This highlights that in bassline cooperating participants appear as a single par
 </div>
 </div>
 </li>
-<li><a id="orgec9b39d"></a>Communication without input<br />
-<div class="outline-text-5" id="text-3-1-2-4">
+<li><a id="org2802b18"></a>Communication without input<br />
+<div class="outline-text-5" id="text-2-1-2-4">
 <p>
 Not all communication take input.
 </p>
@@ -340,16 +385,15 @@ It can be used with anything that wants a capability to receive information, and
 </p>
 
 <div class="org-src-container">
-<pre class="src src-js"><span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">clock</span> = (ms = <span style="color: #E27E8D; font-weight: bold;">1000</span>) =&gt; {
-  <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">p</span> = port(<span style="color: #E27E8D; font-weight: bold;">1</span>)
-  <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">tick</span> = () =&gt; p.send({ ts: Date.now() })
-  <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">interval</span> = setInterval(tick, ms)
-  tick()
+<pre class="src src-js"><span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">function</span> clock(<span style="color: #718CA1;">ms</span> = <span style="color: #E27E8D; font-weight: bold;">1000</span>, <span style="color: #718CA1;">eager</span> = <span style="color: #E27E8D;">true</span>) {
+  <span style="color: #5EC4FF;">const</span> {send, to, close} = propagator((_, p) =&gt; p({ts: Date.now()}))
+  <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">interval</span> = setInterval(send, ms)
+  <span style="color: #5EC4FF;">if</span>(eager) send({})
   <span style="color: #5EC4FF;">return</span> {
-    recv: p.recv,
+    to,
     close: () =&gt; {
       clearInterval(interval)
-      p.close()
+      close()
     },
   }
 }
@@ -360,13 +404,13 @@ It can be used with anything that wants a capability to receive information, and
 </ol>
 </div>
 </div>
-<div id="outline-container-org0e1fca3" class="outline-3">
-<h3 id="org0e1fca3"><span class="section-number-3">3.2.</span> Messages</h3>
-<div class="outline-text-3" id="text-3-2">
+<div id="outline-container-orgc872392" class="outline-3">
+<h3 id="orgc872392"><span class="section-number-3">2.2.</span> Messages</h3>
+<div class="outline-text-3" id="text-2-2">
 </div>
-<div id="outline-container-orga000597" class="outline-4">
-<h4 id="orga000597"><span class="section-number-4">3.2.1.</span> Abstractly</h4>
-<div class="outline-text-4" id="text-3-2-1">
+<div id="outline-container-org1c455dc" class="outline-4">
+<h4 id="org1c455dc"><span class="section-number-4">2.2.1.</span> Abstractly</h4>
+<div class="outline-text-4" id="text-2-2-1">
 <p>
 A message is a fragment of partial information. It is whatever can be locally held, passed around, inspected, and combined without requiring a complete picture of the world.
 </p>
@@ -376,11 +420,42 @@ A message does not come with privileged meaning beyond what participants give it
 If provenance, correlation, naming, coordination hints, or other structure matters, it lives in the message like any other data.
 Bassline does not want a separate metadata plane that is somehow more real than the information being exchanged.
 </p>
+
+<p>
+<b>Note: The following is a bit of new prose for messages i&rsquo;m testing</b>
+</p>
+
+<p>
+Messages are data, not &ldquo;code&rdquo;. They are inert unless interpreted and acted upon.
+Interpreting a message is the local act of &ldquo;binding&rdquo; the meaning of message to some local program execution.
+</p>
+
+<p>
+As such it doesn&rsquo;t violate our model of messaging &amp; communication, if there exists purely local capabilities bound by other local participants, traveling ALONGSIDE the data.
+</p>
+
+<p>
+This is equivalent to ports, we don&rsquo;t care who added these capabilities, but we can observe them and act on them locally.
+</p>
+
+<p>
+This isn&rsquo;t possible in all systems, but it&rsquo;s a useful pattern none the less.
+</p>
+
+<p>
+The constraints to make this &ldquo;work&rdquo; are:
+</p>
+<ul class="org-ul">
+<li>capabilities must be allowed to be ignored</li>
+<li>capabilities must never return values directly, they should be opaque</li>
+<li>capabilities shouldn&rsquo;t removed data from the message itself, they should only enrich it for those interested</li>
+<li>capabilities cannot travel over the wire, unless they are reified as a higher order message.</li>
+</ul>
 </div>
 </div>
-<div id="outline-container-orgb4494fd" class="outline-4">
-<h4 id="orgb4494fd"><span class="section-number-4">3.2.2.</span> Concretely</h4>
-<div class="outline-text-4" id="text-3-2-2">
+<div id="outline-container-orgb9e2126" class="outline-4">
+<h4 id="orgb9e2126"><span class="section-number-4">2.2.2.</span> Concretely</h4>
+<div class="outline-text-4" id="text-2-2-2">
 <p>
 A message is a plain object with string keys. It can be empty, partially filled, or nested inside other messages.
 </p>
@@ -390,9 +465,9 @@ The concrete representation is intentionally minimal. Plain objects are open-end
 </p>
 </div>
 </div>
-<div id="outline-container-orgf44b1b0" class="outline-4">
-<h4 id="orgf44b1b0"><span class="section-number-4">3.2.3.</span> Simple Messages</h4>
-<div class="outline-text-4" id="text-3-2-3">
+<div id="outline-container-orgc4d356d" class="outline-4">
+<h4 id="orgc4d356d"><span class="section-number-4">2.2.3.</span> Simple Messages</h4>
+<div class="outline-text-4" id="text-2-2-3">
 <p>
 <code>message()</code> normalizes its input into a message:
 </p>
@@ -404,211 +479,108 @@ Anything else is wrapped as <code>{body: value}</code>.
 </p>
 
 <div class="org-src-container">
-<pre class="src src-js"><span style="color: #5EC4FF;">import</span> { isPlainObject, isString, hasKeys } from <span style="color: #539AFC;">'./utils.js'</span>
-
-<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">isEmpty</span> = msg =&gt; Object.keys(msg).length === <span style="color: #E27E8D; font-weight: bold;">0</span>
-<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">message</span> = content =&gt; {
-  <span style="color: #5EC4FF;">if</span> (content === <span style="color: #E27E8D;">undefined</span>) <span style="color: #5EC4FF;">return</span> {}
-  <span style="color: #5EC4FF;">if</span> (isPlainObject(content)) <span style="color: #5EC4FF;">return</span> { ...content }
+<pre class="src src-js"><span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">function</span> message(<span style="color: #718CA1;">content</span>) {
+  <span style="color: #5EC4FF;">if</span> (is.<span style="color: #E27E8D;">undefined</span>(content)) <span style="color: #5EC4FF;">return</span> {}
+  <span style="color: #5EC4FF;">if</span> (is.msg(content)) <span style="color: #5EC4FF;">return</span> {...content}
   <span style="color: #5EC4FF;">return</span> { body: content }
 }
 </pre>
 </div></li>
 </ul>
-
+</div>
+</div>
+<div id="outline-container-orge48680c" class="outline-4">
+<h4 id="orge48680c"><span class="section-number-4">2.2.4.</span> Messages with capabilities</h4>
+<div class="outline-text-4" id="text-2-2-4">
 <p>
-<code>update</code>, as the name implies, updates a message using a function.
+This is a reference implementation of a message with capabilities bound by another participant.
 </p>
 
 <p>
-Calling update with two arguments <code>update(msg, fn)</code> will apply <code>fn(msg)</code>, and normalize the output as a message.
-Calling update with a single argument is curried, <code>update(fn)</code> produces a function  <code>msg -&gt; update(msg, fn)</code>.
+The interesting things to note here are the this allows us to express how a local participant can act on a message, allowing us share a send with a message.
+</p>
+
+<p>
+This makes messages not just data, but data enhanced with associated behavior through an interaction surface.
+</p>
+
+<p>
+By closing over a function that hides our acceptance criteria, we bind a capability to behaviorally test a receiver without ever assuming that the outside world exists or is stable.
+</p>
+
+<p>
+For example, we can build TCP like acknowledgement flows. But what&rsquo;s interesting is that the receiver of the message, cannot know what the final destination / intent of the response will be.
+</p>
+
+<p>
+This asymmetry falls naturally out of the model we have, and is an extremely powerful tool for opaquely testing and validating how peers are behaving.
+</p>
+
+<p>
+Consider traditional &ldquo;challenge&rdquo; protocols. The person being challenged knows that they are being challenged as they are engaging in a shared common protocol.
+</p>
+
+<p>
+Whereas if messages carry capabilities, the recipient of a message only sees the capability along with the data, and they never know if the message is a &ldquo;test&rdquo;, as that&rsquo;s a private perspective only the capability provider knows.
+It also lets them add / remove / replace capabilities as they process and share the messages.
 </p>
 
 <div class="org-src-container">
-<pre class="src src-js"><span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">function</span> update(...args) {
-  <span style="color: #5EC4FF;">switch</span> (args.length) {
-    <span style="color: #5EC4FF;">case</span> <span style="color: #E27E8D; font-weight: bold;">1</span>: {
-      <span style="color: #5EC4FF;">const</span> [<span style="color: #718CA1;">fn</span>] = args
-      <span style="color: #5EC4FF;">return</span> msg =&gt; message(fn(msg))
+<pre class="src src-js"><span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">hasCap</span> = (msg, name) =&gt; table.has(msg, [name]) &amp;&amp; is.fn(msg[name])
+
+<span style="color: #5EC4FF;">function</span> <span style="color: #33CED8;">assertHandlers</span>(<span style="color: #718CA1;">handlers</span>) {
+  <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">syms</span> = table.syms(handlers)
+  <span style="color: #5EC4FF;">for</span> (<span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">sym</span> <span style="color: #5EC4FF;">of</span> syms) {
+    <span style="color: #5EC4FF;">if</span> (!is.symbol(sym)) <span style="color: #5EC4FF;">throw</span> <span style="color: #5EC4FF;">new</span> <span style="color: #a9a9a9; font-weight: bold;">Error</span>(<span style="color: #539AFC;">'invalid handler key, must be a symbol!'</span>)
+    <span style="color: #5EC4FF;">if</span> (!is.fn(handlers[sym])) <span style="color: #5EC4FF;">throw</span> <span style="color: #5EC4FF;">new</span> <span style="color: #a9a9a9; font-weight: bold;">Error</span>(<span style="color: #539AFC;">'invalid handler,  must be a function'</span>)
+  }
+  <span style="color: #5EC4FF;">return</span> syms
+}
+
+<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">function</span> offer(<span style="color: #718CA1;">handlers</span>) {
+  <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">syms</span> = assertHandlers(handlers)
+  <span style="color: #5EC4FF;">return</span> propagator((msg, propagate) =&gt; {
+    <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">enriched</span> = { ...msg }
+    <span style="color: #5EC4FF;">for</span> (<span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">sym</span> <span style="color: #5EC4FF;">of</span> syms) {
+      enriched[sym] = m =&gt; <span style="color: #5EC4FF;">void</span> <span style="color: #718CA1;">handlers</span>[sym](m)
     }
-    <span style="color: #5EC4FF;">case</span> <span style="color: #E27E8D; font-weight: bold;">2</span>: {
-      <span style="color: #5EC4FF;">const</span> [<span style="color: #718CA1;">msg</span>, <span style="color: #718CA1;">fn</span>] = args
-      <span style="color: #5EC4FF;">return</span> message(fn(msg))
+    propagate(enriched)
+  })
+}
+
+<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">function</span> accept(<span style="color: #718CA1;">handlers</span>) {
+  <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">syms</span> = assertHandlers(handlers)
+  <span style="color: #5EC4FF;">return</span> propagator(<span style="color: #5EC4FF;">async</span> (msg, propagate) =&gt; {
+    <span style="color: #5EC4FF;">for</span> (<span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">sym</span> <span style="color: #5EC4FF;">of</span> syms) {
+      <span style="color: #5EC4FF;">if</span> (hasCap(msg, sym)) <span style="color: #5EC4FF;">await</span> handlers[sym](msg, msg[sym])
     }
-    <span style="color: #5EC4FF;">default</span>:
-      <span style="color: #5EC4FF;">throw</span> <span style="color: #5EC4FF;">new</span> <span style="color: #a9a9a9; font-weight: bold;">Error</span>(<span style="color: #539AFC;">`invalid update arity: ${args.length}`</span>)
-  }
+    propagate(msg)
+  })
 }
 </pre>
 </div>
 </div>
 </div>
-<div id="outline-container-org211c292" class="outline-4">
-<h4 id="org211c292"><span class="section-number-4">3.2.4.</span> Faults</h4>
-<div class="outline-text-4" id="text-3-2-4">
-<p>
-This indicates that local processing cannot continue, and we must stop.
-</p>
-
-<p>
-You don&rsquo;t have to use this construct, but it&rsquo;s convenient since it&rsquo;s message aware.
-</p>
-
-<div class="org-src-container">
-<pre class="src src-js"><span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">class</span> Fault <span style="color: #5EC4FF;">extends</span> Error {
-  constructor(condition, msg, context = {}) {
-    <span style="color: #5EC4FF;">super</span>(<span style="color: #539AFC;">`fault: ${condition}`</span>)
-    <span style="color: #E27E8D;">this</span>.condition = condition
-    <span style="color: #E27E8D;">this</span>.msg = msg
-    <span style="color: #E27E8D;">this</span>.context = context
-  }
-  toMessage() {
-    <span style="color: #5EC4FF;">return</span> message({ condition: <span style="color: #E27E8D;">this</span>.condition, msg: <span style="color: #E27E8D;">this</span>.msg, ...<span style="color: #E27E8D;">this</span>.context })
-  }
-}
-
-<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">fault</span> = (condition, msg, context) =&gt; <span style="color: #5EC4FF;">new</span> <span style="color: #a9a9a9; font-weight: bold;">Fault</span>(condition, msg, context)
-</pre>
 </div>
 </div>
-</div>
-<div id="outline-container-orgc42e9b1" class="outline-4">
-<h4 id="orgc42e9b1"><span class="section-number-4">3.2.5.</span> Higher Order Messages</h4>
-<div class="outline-text-4" id="text-3-2-5">
-<p>
-As you are building with Bassline you may find yourself in a situation where you want to add data to a message,
-but that data isn&rsquo;t relevant to the message, but it&rsquo;s related to it.
-</p>
-
-<p>
-This is a very strong smell of a leaky ontology, and you should consider what you are trying to express.
-Are you trying to say something about the message? Compare it to another message?
-All of these would call for &ldquo;higher order messages&rdquo;.
-</p>
-
-<p>
-A higher order message is simply a message where the data is other messages.
-<i>Isn&rsquo;t this just a nested object?!</i>
-Structurally sure, but not semantically.
-</p>
-
-<p>
-A message is a unit of information about something.
-If I am expressing 2d coordinates a fragment like <code>{x: 123}</code> isn&rsquo;t enough.
-What I am trying to express is a 2d coordinate, so <code>{x: 123, y: 456}</code> is enough for me.
-Anything smaller and i&rsquo;m lacking essential information for someone to derive meaning.
-</p>
-
-<p>
-So &ldquo;message-ness&rdquo; isn&rsquo;t a black and white property, it&rsquo;s a matter of what we are trying to express, and whether the message is complete with regards to that.
-</p>
-
-<p>
-<b>Note: None of these are mandates! These are just useful patterns we have discovered while using Bassline!</b>
-</p>
-
-<p>
-<b>Bonus Note: Higher order messages let us lift any message interpretation as a sharable message</b>
-</p>
-
-<p>
-This lets us do things like partially apply a message, build things like schedulers, compilers, and routers using nothing more than messages.
-In fact let in is effectively a dumb compiler, and composing them gives us something like a nano-pass compiler.
-</p>
-</div>
-<ol class="org-ol">
-<li><a id="org110c260"></a>Let in<br />
-<div class="outline-text-5" id="text-3-2-5-1">
-<p>
-The higher order message, <code>let:in:</code> can be used as a binding message. Allowing us to express a single pass rewrite via a message.
-</p>
-
-<div class="org-src-container">
-<pre class="src src-js"><span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">input</span> = {
-  <span style="color: #5EC4FF;">let</span>: {
-    foo: <span style="color: #E27E8D; font-weight: bold;">123</span>,
-    bar: {
-      something: <span style="color: #539AFC;">'else'</span>,
-    },
-  },
-  <span style="color: #5EC4FF;">in</span>: {
-    a: <span style="color: #539AFC;">'foo'</span>,
-    b: <span style="color: #539AFC;">'bar'</span>,
-    c: <span style="color: #539AFC;">'bar'</span>,
-    d: <span style="color: #539AFC;">'bar'</span>,
-  },
-}
-</pre>
-</div>
-
-<p>
-<code>expand</code> implements this binding convention.
-It treats <code>let</code> as a local binding scope and <code>in</code> as the deferred message body.
-Expansion is intentionally tiny:
-</p>
-<ul class="org-ul">
-<li>it only expands when both <code>let</code> and <code>in</code> are plain objects</li>
-<li>it rewrites only the <code>in</code> branch</li>
-<li>it replaces string leaves that match names in <code>let</code></li>
-<li>replacement is a single pass</li>
-</ul>
-
-<div class="org-src-container">
-<pre class="src src-js"><span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">function</span> expand(<span style="color: #718CA1;">msg</span>) {
-  <span style="color: #5EC4FF;">switch</span> (<span style="color: #E27E8D;">true</span>) {
-    <span style="color: #5EC4FF;">case</span> !hasKeys(msg, [<span style="color: #539AFC;">'let'</span>, <span style="color: #539AFC;">'in'</span>]):
-      <span style="color: #5EC4FF;">throw</span> fault(<span style="color: #539AFC;">'expand requires msg to have keys let &amp; in'</span>)
-    <span style="color: #5EC4FF;">case</span> !isPlainObject(msg.<span style="color: #5EC4FF;">let</span>):
-    <span style="color: #5EC4FF;">case</span> !isPlainObject(msg.<span style="color: #5EC4FF;">in</span>):
-      <span style="color: #5EC4FF;">throw</span> fault(<span style="color: #539AFC;">'msg.in &amp; msg.let must be objects'</span>)
-    <span style="color: #5EC4FF;">default</span>:
-      <span style="color: #5EC4FF;">return</span> rewrite(msg.<span style="color: #5EC4FF;">let</span>, msg.<span style="color: #5EC4FF;">in</span>)
-  }
-}
-
-<span style="color: #5EC4FF;">function</span> <span style="color: #33CED8;">rewrite</span>(<span style="color: #718CA1;">bindings</span>, <span style="color: #718CA1;">value</span>) {
-  <span style="color: #5EC4FF;">switch</span> (<span style="color: #E27E8D;">true</span>) {
-    <span style="color: #5EC4FF;">case</span> isString(value) &amp;&amp; value <span style="color: #5EC4FF;">in</span> bindings:
-      <span style="color: #5EC4FF;">return</span> bindings[value]
-    <span style="color: #5EC4FF;">case</span> Array.isArray(value):
-      <span style="color: #5EC4FF;">return</span> value.map(item =&gt; rewrite(bindings, item))
-    <span style="color: #5EC4FF;">case</span> isPlainObject(value): {
-      <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">out</span> = {}
-      <span style="color: #5EC4FF;">for</span> (<span style="color: #5EC4FF;">const</span> [<span style="color: #718CA1;">k</span>, <span style="color: #718CA1;">v</span>] <span style="color: #5EC4FF;">of</span> Object.entries(value)) out[k] = rewrite(bindings, v)
-      <span style="color: #5EC4FF;">return</span> out
-    }
-    <span style="color: #5EC4FF;">default</span>:
-      <span style="color: #5EC4FF;">return</span> value
-  }
-  <span style="color: #5EC4FF;">return</span> value
-}
-</pre>
-</div>
-</div>
-</li>
-</ol>
-</div>
-</div>
-</div>
-<div id="outline-container-org1115bb4" class="outline-2">
-<h2 id="org1115bb4"><span class="section-number-2">4.</span> Transports</h2>
-<div class="outline-text-2" id="text-4">
+<div id="outline-container-orgccc7ba8" class="outline-2">
+<h2 id="orgccc7ba8"><span class="section-number-2">3.</span> Transports</h2>
+<div class="outline-text-2" id="text-3">
 <p>
 As above, it helps to separate the abstract role of a transport from the concrete transport used in this book.
 </p>
 </div>
-<div id="outline-container-org8f517b2" class="outline-3">
-<h3 id="org8f517b2"><span class="section-number-3">4.1.</span> Abstractly</h3>
-<div class="outline-text-3" id="text-4-1">
+<div id="outline-container-org5476222" class="outline-3">
+<h3 id="org5476222"><span class="section-number-3">3.1.</span> Abstractly</h3>
+<div class="outline-text-3" id="text-3-1">
 <p>
 A transport adapts some external medium into local communication capabilities. This matters because the programming model should not change just because information crossed a process boundary, a machine boundary, or a device boundary. Local and non-local communication differ in mechanics, but they should not require different conceptual tools.
 </p>
 </div>
 </div>
-<div id="outline-container-org4906d6d" class="outline-3">
-<h3 id="org4906d6d"><span class="section-number-3">4.2.</span> Concretely</h3>
-<div class="outline-text-3" id="text-4-2">
+<div id="outline-container-org29539a1" class="outline-3">
+<h3 id="org29539a1"><span class="section-number-3">3.2.</span> Concretely</h3>
+<div class="outline-text-3" id="text-3-2">
 <p>
 Every transport produces the same thing: a port with <code>send</code>, <code>recv</code>, and <code>close</code>. What differs is the medium underneath and whether that medium carries raw bytes or discrete messages.
 </p>
@@ -617,20 +589,19 @@ Every transport produces the same thing: a port with <code>send</code>, <code>re
 Byte transports (TCP sockets, stdio, serial) carry raw chunks. They need a framing layer to delimit and parse messages. Message transports (WebSocket, WebWorker/MessagePort) carry discrete messages natively and skip framing entirely.
 </p>
 </div>
-<div id="outline-container-org37a6d69" class="outline-4">
-<h4 id="org37a6d69"><span class="section-number-4">4.2.1.</span> Framing</h4>
-<div class="outline-text-4" id="text-4-2-1">
+<div id="outline-container-orge92b5f6" class="outline-4">
+<h4 id="orge92b5f6"><span class="section-number-4">3.2.1.</span> Framing</h4>
+<div class="outline-text-4" id="text-3-2-1">
 <p>
 Framing is separated from any specific transport. <code>readFrame</code> bridges a byte-level <code>recv</code> to a message-level <code>send</code>: it consumes chunks, accumulates them in a buffer, splits on newlines, and emits parsed messages. <code>format</code> is a plain function that serializes a message as a JSON line.
 </p>
 
 <div class="org-src-container">
-<pre class="src src-js"><span style="color: #5EC4FF;">import</span> { message } from <span style="color: #539AFC;">'../messages.js'</span>
-<span style="color: #5EC4FF;">import</span> { consume } from <span style="color: #539AFC;">'../comm.js'</span>
+<pre class="src src-js"><span style="color: #5EC4FF;">import</span> { message, consume } from <span style="color: #539AFC;">'../bassline.js'</span>
 
-<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">function</span> readFrame(<span style="color: #718CA1;">recv</span>, <span style="color: #718CA1;">send</span>) {
+<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">function</span> readFrame(<span style="color: #718CA1;">recv</span>, <span style="color: #718CA1;">dest</span>) {
   <span style="color: #5EC4FF;">let</span> <span style="color: #718CA1;">buffer</span> = <span style="color: #539AFC;">''</span>
-  consume(recv, chunk =&gt; {
+  <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">prop</span> = consume(recv, (chunk, send) =&gt; {
     buffer += chunk
     <span style="color: #5EC4FF;">let</span> <span style="color: #718CA1;">nl</span>
     <span style="color: #5EC4FF;">while</span> ((nl = buffer.indexOf(<span style="color: #539AFC;">'\n'</span>)) !== -<span style="color: #E27E8D; font-weight: bold;">1</span>) {
@@ -644,6 +615,8 @@ Framing is separated from any specific transport. <code>readFrame</code> bridges
       }
     }
   })
+  prop.to(dest)
+  <span style="color: #5EC4FF;">return</span> prop
 }
 
 <span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">format</span> = msg =&gt; JSON.stringify(msg) + <span style="color: #539AFC;">'\n'</span>
@@ -657,16 +630,16 @@ Framing is separated from any specific transport. <code>readFrame</code> bridges
 </p>
 </div>
 </div>
-<div id="outline-container-orgaaea139" class="outline-4">
-<h4 id="orgaaea139"><span class="section-number-4">4.2.2.</span> Socket</h4>
-<div class="outline-text-4" id="text-4-2-2">
+<div id="outline-container-org08fc9bd" class="outline-4">
+<h4 id="org08fc9bd"><span class="section-number-4">3.2.2.</span> Socket</h4>
+<div class="outline-text-4" id="text-3-2-2">
 <p>
 A socket is a byte transport. <code>fromSocket</code> creates a raw port for byte chunks, a message port for parsed messages, and bridges them through <code>frame.read</code>. Outgoing messages are formatted and written directly to the socket.
 </p>
 
 <div class="org-src-container">
 <pre class="src src-js"><span style="color: #5EC4FF;">import</span> net from <span style="color: #539AFC;">'node:net'</span>
-<span style="color: #5EC4FF;">import</span> { port } from <span style="color: #539AFC;">'../comm.js'</span>
+<span style="color: #5EC4FF;">import</span> { port } from <span style="color: #539AFC;">'../bassline.js'</span>
 <span style="color: #5EC4FF;">import</span> defaultFrame from <span style="color: #539AFC;">'../frame/jsonl.js'</span>
 
 <span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">function</span> fromSocket(<span style="color: #718CA1;">socket</span>, <span style="color: #718CA1;">frame</span> = <span style="color: #718CA1;">defaultFrame</span>) {
@@ -697,9 +670,9 @@ A socket is a byte transport. <code>fromSocket</code> creates a raw port for byt
 </div>
 </div>
 </div>
-<div id="outline-container-org5f47080" class="outline-4">
-<h4 id="org5f47080"><span class="section-number-4">4.2.3.</span> Serving (TCP)</h4>
-<div class="outline-text-4" id="text-4-2-3">
+<div id="outline-container-orgaeb5a5f" class="outline-4">
+<h4 id="orgaeb5a5f"><span class="section-number-4">3.2.3.</span> Serving (TCP)</h4>
+<div class="outline-text-4" id="text-3-2-3">
 <p>
 A TCP server listens on a socket and produces a port of connections. Each connection is itself a port, produced by <code>fromSocket</code>.
 </p>
@@ -707,7 +680,7 @@ A TCP server listens on a socket and produces a port of connections. Each connec
 <div class="org-src-container">
 <pre class="src src-js"><span style="color: #5EC4FF;">import</span> nodeNet from <span style="color: #539AFC;">'node:net'</span>
 <span style="color: #5EC4FF;">import</span> { fromSocket } from <span style="color: #539AFC;">'../transports/socket.js'</span>
-<span style="color: #5EC4FF;">import</span> { port } from <span style="color: #539AFC;">'../comm.js'</span>
+<span style="color: #5EC4FF;">import</span> { port } from <span style="color: #539AFC;">'../bassline.js'</span>
 
 <span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">function</span> serve(<span style="color: #718CA1;">options</span> = {}, <span style="color: #718CA1;">frame</span>) {
   <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">p</span> = port()
@@ -730,16 +703,16 @@ A TCP server listens on a socket and produces a port of connections. Each connec
 </div>
 </div>
 </div>
-<div id="outline-container-org830bebc" class="outline-4">
-<h4 id="org830bebc"><span class="section-number-4">4.2.4.</span> Serving (WebSocket)</h4>
-<div class="outline-text-4" id="text-4-2-4">
+<div id="outline-container-orgc1a6fcc" class="outline-4">
+<h4 id="orgc1a6fcc"><span class="section-number-4">3.2.4.</span> Serving (WebSocket)</h4>
+<div class="outline-text-4" id="text-3-2-4">
 <p>
 A WebSocket server wraps an existing <code>WebSocketServer</code> instance and produces a port of connections, matching the TCP serve API shape. The caller brings their own <code>WebSocketServer</code> — no <code>ws</code> dependency in core.
 </p>
 
 <div class="org-src-container">
 <pre class="src src-js"><span style="color: #5EC4FF;">import</span> { fromWebSocket } from <span style="color: #539AFC;">'../transports/websocket.js'</span>
-<span style="color: #5EC4FF;">import</span> { port } from <span style="color: #539AFC;">'../comm.js'</span>
+<span style="color: #5EC4FF;">import</span> { port } from <span style="color: #539AFC;">'../bassline.js'</span>
 
 <span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">function</span> serve(<span style="color: #718CA1;">wss</span>) {
   <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">p</span> = port()
@@ -759,16 +732,15 @@ A WebSocket server wraps an existing <code>WebSocketServer</code> instance and p
 </div>
 </div>
 </div>
-<div id="outline-container-org3085299" class="outline-4">
-<h4 id="org3085299"><span class="section-number-4">4.2.5.</span> WebSocket</h4>
-<div class="outline-text-4" id="text-4-2-5">
+<div id="outline-container-orge4724a9" class="outline-4">
+<h4 id="orge4724a9"><span class="section-number-4">3.2.5.</span> WebSocket</h4>
+<div class="outline-text-4" id="text-3-2-5">
 <p>
 A WebSocket is a message transport. Each <code>ws.send()</code> is one discrete message, so no framing is needed. This works in the browser with native <code>WebSocket</code>, in Node.js with the <code>ws</code> package, and for <code>RTCDataChannel</code> since it has the same event interface.
 </p>
 
 <div class="org-src-container">
-<pre class="src src-js"><span style="color: #5EC4FF;">import</span> { port } from <span style="color: #539AFC;">'../comm.js'</span>
-<span style="color: #5EC4FF;">import</span> { message } from <span style="color: #539AFC;">'../messages.js'</span>
+<pre class="src src-js"><span style="color: #5EC4FF;">import</span> { port, message } from <span style="color: #539AFC;">'../bassline.js'</span>
 
 <span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">function</span> fromWebSocket(<span style="color: #718CA1;">ws</span>) {
   <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">p</span> = port()
@@ -795,16 +767,15 @@ A WebSocket is a message transport. Each <code>ws.send()</code> is one discrete 
 </div>
 </div>
 </div>
-<div id="outline-container-org047f59e" class="outline-4">
-<h4 id="org047f59e"><span class="section-number-4">4.2.6.</span> WebWorker</h4>
-<div class="outline-text-4" id="text-4-2-6">
+<div id="outline-container-org659cf9e" class="outline-4">
+<h4 id="org659cf9e"><span class="section-number-4">3.2.6.</span> WebWorker</h4>
+<div class="outline-text-4" id="text-3-2-6">
 <p>
 A <code>MessagePort</code> is a message transport that uses structured clone. Objects cross the boundary without serialization. Works with <code>Worker</code>, <code>MessagePort</code>, <code>SharedWorker.port</code>, and <code>BroadcastChannel</code>.
 </p>
 
 <div class="org-src-container">
-<pre class="src src-js"><span style="color: #5EC4FF;">import</span> { port } from <span style="color: #539AFC;">'../comm.js'</span>
-<span style="color: #5EC4FF;">import</span> { message } from <span style="color: #539AFC;">'../messages.js'</span>
+<pre class="src src-js"><span style="color: #5EC4FF;">import</span> { port, message } from <span style="color: #539AFC;">'../bassline.js'</span>
 
 <span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">function</span> fromPort(<span style="color: #718CA1;">messagePort</span>) {
   <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">p</span> = port()
@@ -821,16 +792,16 @@ A <code>MessagePort</code> is a message transport that uses structured clone. Ob
 </div>
 </div>
 </div>
-<div id="outline-container-org1197ac5" class="outline-4">
-<h4 id="org1197ac5"><span class="section-number-4">4.2.7.</span> Stdio</h4>
-<div class="outline-text-4" id="text-4-2-7">
+<div id="outline-container-orga796202" class="outline-4">
+<h4 id="orga796202"><span class="section-number-4">3.2.7.</span> Stdio</h4>
+<div class="outline-text-4" id="text-3-2-7">
 <p>
 Stdio is a byte transport, like TCP, and uses framing internally to produce a port of messages.
 </p>
 
 <div class="org-src-container">
 <pre class="src src-js"><span style="color: #5EC4FF;">import</span> readline from <span style="color: #539AFC;">'node:readline'</span>
-<span style="color: #5EC4FF;">import</span> { port } from <span style="color: #539AFC;">'../comm.js'</span>
+<span style="color: #5EC4FF;">import</span> { port } from <span style="color: #539AFC;">'../bassline.js'</span>
 <span style="color: #5EC4FF;">import</span> defaultFrame from <span style="color: #539AFC;">'../frame/jsonl.js'</span>
 
 <span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">function</span> fromStdio(<span style="color: #718CA1;">frame</span> = <span style="color: #718CA1;">defaultFrame</span>) {
@@ -859,192 +830,68 @@ Stdio is a byte transport, like TCP, and uses framing internally to produce a po
 </div>
 </div>
 </div>
-<div id="outline-container-org2f80d0c" class="outline-2">
-<h2 id="org2f80d0c"><span class="section-number-2">5.</span> Deployment (Draft)</h2>
-<div class="outline-text-2" id="text-5">
-<p>
-This is a stub, so you can ignore this for now!
-</p>
-
-<p>
-Deployment also has an abstract layer and a concrete one.
-</p>
-</div>
-<div id="outline-container-orgfb045b9" class="outline-3">
-<h3 id="orgfb045b9"><span class="section-number-3">5.1.</span> Abstractly</h3>
-<div class="outline-text-3" id="text-5-1">
-<p>
-A bassline system is deployed by making communication available somewhere and wiring local logic to it. Deployment is not where the system acquires a fixed command surface or a closed set of capabilities. It is where some part of the world becomes reachable for communication.
-</p>
-
-<p>
-The reason this stays lightweight is the same reason the rest of the model stays lightweight: coordination is driven by message flow and local interpretation, not by a privileged deployment schema.
-</p>
-</div>
-</div>
-<div id="outline-container-org0bdc687" class="outline-3">
-<h3 id="org0bdc687"><span class="section-number-3">5.2.</span> Concretely</h3>
-<div class="outline-text-3" id="text-5-2">
-<p>
-A bassline system can run as a daemon, a long-lived process listening on a socket. Interacting with it means obtaining a communication capability and exchanging messages.
-</p>
-</div>
-<div id="outline-container-orga9ba6ba" class="outline-4">
-<h4 id="orga9ba6ba"><span class="section-number-4">5.2.1.</span> The daemon is just a server with a recv loop</h4>
-<div class="outline-text-4" id="text-5-2-1">
-<p>
-A boot script opens a socket and starts consuming connections. Each connection is a port. What the daemon does with those messages is determined by whatever logic is wired in. There is no fixed set of capabilities.
-</p>
-
+<div id="outline-container-org02bb93d" class="outline-2">
+<h2 id="org02bb93d"><span class="section-number-2">4.</span> Utilities</h2>
+<div class="outline-text-2" id="text-4">
 <div class="org-src-container">
-<pre class="src src-js"><span style="color: #5EC4FF;">import</span> { serve } from <span style="color: #539AFC;">'./serve/tcp.js'</span>
-<span style="color: #5EC4FF;">import</span> { consume } from <span style="color: #539AFC;">'./comm.js'</span>
-
-<span style="color: #5EC4FF;">const</span> { recv } = serve({ path: <span style="color: #539AFC;">'~/.bassline/sock'</span> })
-
-consume(recv, <span style="color: #5EC4FF;">async</span> conn =&gt; {
-  consume(conn.recv, msg =&gt; conn.send(handle(msg)))
-})
-</pre>
-</div>
-
-<p>
-The <code>handle</code> function is where all the logic lives. It could route messages onward, evaluate expressions, update state, or do nothing. The daemon just opens the door.
-</p>
-</div>
-</div>
-<div id="outline-container-orgc66dfa1" class="outline-4">
-<h4 id="orgc66dfa1"><span class="section-number-4">5.2.2.</span> A REPL is just a transport</h4>
-<div class="outline-text-4" id="text-5-2-2">
-<p>
-A command-line interface is a connection over stdio instead of a socket. <code>fromStdio()</code> gives you a port backed by stdin/stdout with the same framing as TCP.
-</p>
-
-<div class="org-src-container">
-<pre class="src src-js"><span style="color: #5EC4FF;">import</span> { fromStdio } from <span style="color: #539AFC;">'./transports/stdio.js'</span>
-
-<span style="color: #5EC4FF;">const</span> { send, recv } = fromStdio()
-</pre>
-</div>
-
-<p>
-The downstream logic sees messages either way, regardless of whether the transport is a socket, a WebSocket, a terminal, or whatever else.
-</p>
-</div>
-</div>
-<div id="outline-container-org7ae9ebb" class="outline-4">
-<h4 id="org7ae9ebb"><span class="section-number-4">5.2.3.</span> Convention</h4>
-<div class="outline-text-4" id="text-5-2-3">
-<p>
-By convention, a bassline daemon keeps its state under <code>~/.bassline/</code>, with <code>BASSLINE_HOME</code> as an override. The socket lives there. What else lives there (persistence files, logs, configuration) depends on what the boot script sets up.
-</p>
-
-<p>
-The boot script is the only thing that&rsquo;s &ldquo;configured&rdquo; in the traditional sense. Everything else emerges from the messages the system receives after it starts listening.
-</p>
-</div>
-</div>
-</div>
-</div>
-<div id="outline-container-orga459321" class="outline-2">
-<h2 id="orga459321"><span class="section-number-2">6.</span> Utilities</h2>
-<div class="outline-text-2" id="text-6">
-</div>
-<div id="outline-container-org2005de5" class="outline-3">
-<h3 id="org2005de5"><span class="section-number-3">6.1.</span> Type Predicates</h3>
-<div class="outline-text-3" id="text-6-1">
-<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
-
-
-<colgroup>
-<col  class="org-left" />
-
-<col  class="org-left" />
-</colgroup>
-<thead>
-<tr>
-<th scope="col" class="org-left">Predicate</th>
-<th scope="col" class="org-left">Tests for</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td class="org-left"><code>isArray</code></td>
-<td class="org-left"><code>Array.isArray</code></td>
-</tr>
-
-<tr>
-<td class="org-left"><code>isNil</code></td>
-<td class="org-left"><code>null</code> or <code>undefined</code></td>
-</tr>
-
-<tr>
-<td class="org-left"><code>isPromise</code></td>
-<td class="org-left"><code>instanceof Promise</code></td>
-</tr>
-
-<tr>
-<td class="org-left"><code>isNumber</code></td>
-<td class="org-left"><code>typeof ==</code> &rsquo;number&rsquo;=</td>
-</tr>
-
-<tr>
-<td class="org-left"><code>isString</code></td>
-<td class="org-left"><code>typeof ==</code> &rsquo;string&rsquo;=</td>
-</tr>
-
-<tr>
-<td class="org-left"><code>isFunction</code></td>
-<td class="org-left"><code>typeof ==</code> &rsquo;function&rsquo;=</td>
-</tr>
-
-<tr>
-<td class="org-left"><code>isPlainObject</code></td>
-<td class="org-left"><code>prototype =</code> Object.prototype=</td>
-</tr>
-
-<tr>
-<td class="org-left"><code>hasKeys</code></td>
-<td class="org-left">Check whether an object has all of the specified keys</td>
-</tr>
-</tbody>
-</table>
-
-<div class="org-src-container">
-<pre class="src src-js"><span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">isArray</span> = v =&gt; Array.isArray(v)
-<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">isNil</span> = obj =&gt; obj == <span style="color: #E27E8D;">null</span>
-<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">isPromise</span> = obj =&gt; obj <span style="color: #5EC4FF;">instanceof</span> <span style="color: #a9a9a9; font-weight: bold;">Promise</span>
-<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">isNumber</span> = v =&gt; <span style="color: #5EC4FF;">typeof</span> v === <span style="color: #539AFC;">'number'</span>
-<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">isString</span> = v =&gt; <span style="color: #5EC4FF;">typeof</span> v === <span style="color: #539AFC;">'string'</span>
-<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">isFunction</span> = v =&gt; <span style="color: #5EC4FF;">typeof</span> v === <span style="color: #539AFC;">'function'</span>
-<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">isNull</span> = v =&gt; v === <span style="color: #E27E8D;">null</span>
-<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">isPlainObject</span> = obj =&gt; {
-  <span style="color: #5EC4FF;">if</span> (obj == <span style="color: #E27E8D;">null</span>) <span style="color: #5EC4FF;">return</span> <span style="color: #E27E8D;">false</span>
-  <span style="color: #5EC4FF;">return</span> Object.getPrototypeOf(obj) === Object.<span style="color: #E27E8D;">prototype</span>
+<pre class="src src-js" id="org8f35eb9"><span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">EOF</span> = Symbol.<span style="color: #5EC4FF;">for</span>(<span style="color: #539AFC;">'$$BASSLINE_EOF$$'</span>)
+<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">function</span> kindOf(<span style="color: #718CA1;">v</span>) {
+  <span style="color: #5EC4FF;">if</span>(v === <span style="color: #E27E8D;">null</span>) <span style="color: #5EC4FF;">return</span> <span style="color: #539AFC;">'null'</span>
+  <span style="color: #5EC4FF;">if</span>(v === <span style="color: #E27E8D;">undefined</span>) <span style="color: #5EC4FF;">return</span> <span style="color: #539AFC;">'undefined'</span>
+  <span style="color: #5EC4FF;">if</span>(v <span style="color: #5EC4FF;">instanceof</span> <span style="color: #a9a9a9; font-weight: bold;">Promise</span>) <span style="color: #5EC4FF;">return</span> <span style="color: #539AFC;">'promise'</span>
+  <span style="color: #5EC4FF;">if</span>(Array.isArray(v)) <span style="color: #5EC4FF;">return</span> <span style="color: #539AFC;">'array'</span>
+  <span style="color: #5EC4FF;">return</span> <span style="color: #5EC4FF;">typeof</span> v
 }
-<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">hasKeys</span> = (obj, keys = []) =&gt; {
-  <span style="color: #5EC4FF;">if</span> (isNil(obj)) <span style="color: #5EC4FF;">return</span> <span style="color: #E27E8D;">false</span>
-  <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">requiredKeys</span> = isArray(keys) ? keys : [keys],
-    objectKeys = <span style="color: #5EC4FF;">new</span> <span style="color: #a9a9a9; font-weight: bold;">Set</span>(Object.keys(obj))
 
-  <span style="color: #5EC4FF;">return</span> requiredKeys.every(key =&gt; objectKeys.has(key))
+<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">table</span> = {
+  keys: o =&gt; (is.nil(o) ? [] : Object.keys(o)),
+  values: o =&gt; (is.nil(o) ? [] : Object.values(o)),
+  entries: o =&gt; (is.nil(o) ? [] : Object.entries(o)),
+  syms: o =&gt; (is.nil(o) ? [] : Object.getOwnPropertySymbols(o)),
+  index: (table, keys) =&gt; keys.map(k =&gt; table[k]),
+  has: (table, keys) =&gt; keys.every(k =&gt; is.defined(table[k]))
 }
-<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">not</span> = predicate =&gt; value =&gt; !predicate(value)
-<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">constant</span> = value =&gt; () =&gt; value
-<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">identity</span> = value =&gt; value
-<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">delay</span> = <span style="color: #5EC4FF;">async</span> (ms = <span style="color: #E27E8D; font-weight: bold;">1000</span>) =&gt; {
-    <span style="color: #5EC4FF;">await</span> <span style="color: #5EC4FF;">new</span> <span style="color: #a9a9a9; font-weight: bold;">Promise</span>(res =&gt; setTimeout(res, ms))
-    <span style="color: #5EC4FF;">return</span>
+
+<span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">isa</span> = kind =&gt; v =&gt; kindOf(v) === kind
+<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">is</span> = {
+  eof: v =&gt; v === EOF,
+  nil: v =&gt; v == <span style="color: #E27E8D;">null</span>,
+  <span style="color: #E27E8D;">null</span>: isa(<span style="color: #539AFC;">'null'</span>),
+  <span style="color: #E27E8D;">undefined</span>: isa(<span style="color: #539AFC;">'undefined'</span>),
+  defined: v =&gt; !(is.<span style="color: #E27E8D;">undefined</span>(v)),
+  promise: isa(<span style="color: #539AFC;">'promise'</span>),
+  number: isa(<span style="color: #539AFC;">'number'</span>),
+  string: isa(<span style="color: #539AFC;">'string'</span>),
+  fn: isa(<span style="color: #539AFC;">'function'</span>),
+  symbol: isa(<span style="color: #539AFC;">'symbol'</span>),
+  array: isa(<span style="color: #539AFC;">'array'</span>),
+  object: isa(<span style="color: #539AFC;">'object'</span>),
+  msg: v =&gt; is.object(v) &amp;&amp; Object.getPrototypeOf(v) === Object.<span style="color: #E27E8D;">prototype</span>
 }
-</pre>
-</div>
-</div>
-</div>
-<div id="outline-container-org59d24b0" class="outline-3">
-<h3 id="org59d24b0"><span class="section-number-3">6.2.</span> Misc</h3>
-<div class="outline-text-3" id="text-6-2">
-<div class="org-src-container">
-<pre class="src src-js"><span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">castArr</span> = value =&gt; (isArray(value) ? value : [value])
+
+<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">lazy</span> = fn =&gt; {
+  <span style="color: #5EC4FF;">let</span> <span style="color: #718CA1;">value</span>, <span style="color: #718CA1;">called</span>;
+  <span style="color: #5EC4FF;">return</span> () =&gt; {
+    <span style="color: #5EC4FF;">if</span> (is.<span style="color: #E27E8D;">undefined</span>(called))
+      value = fn(), called = <span style="color: #E27E8D;">true</span>
+    <span style="color: #5EC4FF;">return</span> value
+  }
+}
+
+<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">delay</span> = <span style="color: #5EC4FF;">async</span> (ms = <span style="color: #E27E8D; font-weight: bold;">1000</span>) =&gt; <span style="color: #5EC4FF;">await</span> <span style="color: #5EC4FF;">new</span> <span style="color: #a9a9a9; font-weight: bold;">Promise</span>(res =&gt; setTimeout(res, ms))
+
+<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">class</span> Fault <span style="color: #5EC4FF;">extends</span> Error {
+  constructor(condition, msg, context = {}) {
+    <span style="color: #5EC4FF;">super</span>(<span style="color: #539AFC;">`fault: ${condition}`</span>)
+    <span style="color: #E27E8D;">this</span>.condition = condition
+    <span style="color: #E27E8D;">this</span>.msg = msg
+    <span style="color: #E27E8D;">this</span>.context = context
+  }
+  toMessage() {
+    <span style="color: #5EC4FF;">return</span> message({ condition: <span style="color: #E27E8D;">this</span>.condition, msg: <span style="color: #E27E8D;">this</span>.msg, ...<span style="color: #E27E8D;">this</span>.context })
+  }
+}
+<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">fault</span> = (condition, msg, context) =&gt; <span style="color: #5EC4FF;">new</span> <span style="color: #a9a9a9; font-weight: bold;">Fault</span>(condition, msg, context)
 </pre>
 </div>
 
@@ -1056,6 +903,18 @@ The boot script is the only thing that&rsquo;s &ldquo;configured&rdquo; in the t
   </div>
   <p class="footer-license">AGPLv3</p>
 </footer>
+</div>
+</div>
+<div id="outline-container-orgc2a7573" class="outline-2">
+<h2 id="orgc2a7573"><span class="section-number-2">5.</span> Items left to finish up</h2>
+<div class="outline-text-2" id="text-5">
+</div>
+<div id="outline-container-org34448ff" class="outline-3">
+<h3 id="org34448ff"><span class="section-number-3">5.1.</span> <span class="todo TODO">TODO</span> Update the transports &amp; frame fault story</h3>
+<div class="outline-text-3" id="text-5-1">
+<p>
+I need to cleanup the fault handling story there.
+</p>
 </div>
 </div>
 </div>

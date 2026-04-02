@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { port, net, consume, EOF, is, propagator, offer, accept, hasCap } from '../src/bassline.js'
+import { port, net, EOF, is, propagator, offer, accept, hasCap } from '../src/bassline.js'
 import { collect, filledPort } from './utils.js'
 import { vi } from 'vitest'
 
@@ -120,33 +120,6 @@ describe('net', () => {
     // a's recv should return EOF since we closed
     expect(await a.recv()).toBe(EOF)
     b.close()
-  })
-})
-
-describe('consume', () => {
-  it('processes all messages until EOF', async () => {
-    const p = port()
-    const values = collect(p.recv)
-    p.send(1)
-    p.send(2)
-    p.send(3)
-    p.close()
-    expect(await values).toEqual([1, 2, 3])
-  })
-
-  it('handles async callbacks', async () => {
-    const p = port()
-    p.send('a')
-    p.send('b')
-    p.close()
-
-    const values = []
-    const prop = consume(p.recv, async v => {
-      await new Promise(r => setTimeout(r, 5))
-      values.push(v)
-    })
-    await prop.promise
-    expect(values).toEqual(['a', 'b'])
   })
 })
 
@@ -317,7 +290,7 @@ describe('capabilities', () => {
     const a = accept({ [SYN]: (msg, cap) => cap({ from: msg.body }) })
     o.to(a.send)
 
-    await o.send({ body: 'ping' })
+    o.send({ body: 'ping' })
     expect(acked).toEqual([{ from: 'ping' }])
   })
 })

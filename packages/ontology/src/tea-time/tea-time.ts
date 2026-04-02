@@ -1,6 +1,5 @@
-import Graph, { DirectedGraph } from 'graphology'
-import { net, port, consume, delay as _delay, offer, accept } from '@bassline/core'
-import type { Send, Recv, Close, Message, Port } from '@bassline/core'
+import { net, consume, delay as _delay, propagator, cell, is, table } from '@bassline/core'
+import type { Port, Message, Propagator, To, Send } from '@bassline/core'
 
 /**
  * An implementation of something that looks like TeaTime as used by croquet
@@ -43,53 +42,64 @@ async function delay(ms = 2000, force = false) {
   if (force || shouldDelay) await _delay(ms)
 }
 
-const STAMP = Symbol.for('stamp')
+const connect = <T>(sources: { to: To<T> }[], target: { send: Send<T> }) => sources.forEach(s => s.to(target.send))
 
-function ordering({ send, recv, close }: Port) {
+function orderingMember({ send, recv }: Port) {
   const id = crypto.randomUUID()
   let lastId = 'ROOT'
-
-  consume(
-    recv,
-    accept({
-      [STAMP]: (res, msg) => {
-        console.log('stamping', msg)
-        const prev = lastId
-        const curr = crypto.randomUUID()
-        lastId = curr
-        const tt = {
-          prev,
-          curr,
-          reflector: id,
-        }
-        res({ tt })
-        send({ tt, msg })
-      },
-    })
-  )
-
-  return close
-}
-
-function peer({ send, recv, close }: Port) {
-  consume(recv, msg => {
-    console.log('saw: ', msg)
+  const fromNet = consume(recv)
+  fromNet.to(msg => {
+    console.log('stamping', msg)
+    const prev = lastId
+    const curr = crypto.randomUUID()
+    lastId = curr
+    const tt = {
+      prev,
+      curr,
+      reflector: id,
+    } as const
+    send({ tt, msg } as const)
   })
-
-  return {
-    send: offer(send, {
-      [STAMP]: msg => console.log('received stamped: ', msg),
-    }),
-    close,
-  }
+  return fromNet
 }
+
+function peer({ send, recv }: Port) {
+  const { to } = consume(recv)
+  return { to, send }
+}
+
+const messageCell = () =>
+  cell<Set<string>>((state, ids, changed) => {
+    let interesting = false
+    ids.forEach(id => {
+      if (state.has(id)) return
+      interesting = true
+      state.add(id)
+    })
+    if (interesting) changed(state)
+    else console.log('yawn')
+  }, new Set())
 
 const n = net()
 
-const closeReflector = ordering(n())
+const ordered = orderingMember(n())
 const a = peer(n())
 const b = peer(n())
 
-a.send({ hello: 'world' })
+const ids = propagator<Message, Set<string>>((msg, p) => {
+  const [tt] = table.index(msg, ['tt'])
+  if (is.nil(tt)) return
+  const [prev, curr] = table.index(tt, ['prev', 'curr'])
+  if (is.string(prev) && is.string(curr)) p(new Set([prev, curr]))
+})
 
+const msgs = messageCell()
+
+b.to(msg => console.log('b saw: ', msg))
+
+a.send({ hello: 'world' })
 b.send({ goodbye: 'world' })
+
+connect([a, b], ids)
+connect([ids], msgs)
+msgs.to(msg => console.log('new messages: ', msg))

@@ -16,7 +16,8 @@
   },
   "scripts": {
     "build": "tsc",
-    "demo:tt": "tsx src/tea-time/tea-time.ts"
+    "demo:tt": "tsx src/tea-time/tea-time.ts",
+    "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {
     "@bassline/core": "workspace:*",

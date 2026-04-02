@@ -1,6 +1,6 @@
 import type { z } from 'zod'
 import type { Port, EOF, Message } from '@bassline/core'
-import { isEOF, consume } from '@bassline/core'
+import { is, consume } from '@bassline/core'
 
 export function guard<T>(schema: z.ZodType<T>): (msg: unknown) => msg is T {
   return (msg: unknown): msg is T => schema.safeParse(msg).success
@@ -16,7 +16,7 @@ export async function request<R extends Message>(
     slot.send(msg)
     while (true) {
       const m = await slot.recv()
-      if (isEOF(m)) return null
+      if (is.eof(m)) return null
       if (match(m)) return m
     }
   } finally {

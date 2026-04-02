@@ -10,7 +10,7 @@ export function isPromiseCap(msg: Message): msg is Cap<typeof RESOLVE> & Cap<typ
 export function ask(dest: Send, msg: Message, timeout = 5000) {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(fault('timeout', msg, { dest })), timeout)
-    offer(dest, {
+    const p = offer({
       [RESOLVE]: res => {
         clearTimeout(timer)
         resolve(res)
@@ -19,6 +19,8 @@ export function ask(dest: Send, msg: Message, timeout = 5000) {
         clearTimeout(timer)
         reject(err)
       },
-    })(msg)
+    })
+    p.to(dest)
+    p.send(msg)
   })
 }

@@ -64,9 +64,9 @@ export function propagator(fn = (v, p) => p(v)) {
   let closed = false
   const targets = lazy(() => new Set())
   const propagate = value => targets().forEach(t => t(value))
-  async function send(value) {
+  function send(value) {
     if (closed) return
-    await fn(value, propagate)
+    Promise.resolve(fn(value, propagate))
   }
   function to(...dests) {
     dests.forEach(d => targets().add(d))
@@ -96,7 +96,7 @@ export function consume(recv, callback) {
     while (true) {
       const msg = await recv()
       if (is.eof(msg)) break
-      await p.send(msg)
+      p.send(msg)
     }
     p.close()
   })()

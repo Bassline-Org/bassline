@@ -1,23 +1,21 @@
-import { offer, accept, Message, Send, delay } from '@bassline/core'
+import { offer, accept, Message, delay, propagator } from '@bassline/core'
 
-const SYN = Symbol.for('ack')
+const SYN = Symbol.for('ack'),
+  MSG_COUNT = 1000000,
+  COOLDOWN = 100,
+  FAILURE_ODDS = 70,
+  MAX_ROUNDS = 20
 
-const MSG_COUNT = 1000000
-const COOLDOWN = 100
-const FAILURE_ODDS = 70
-const MAX_ROUNDS = 20
-let round = 1
-let failures = 0
+let round = 1,
+  failures = 0
 
-function unreliable(send: Send): Send {
+const unreliable = propagator((msg, p) => {
   const rand = (n: number) => Math.floor(Math.random() * n)
-  return msg => {
-    if (rand(100) > FAILURE_ODDS) send(msg)
-    else failures++
-  }
-}
+  if (rand(100) > FAILURE_ODDS) p(msg)
+  else failures++
+})
 
-function reliable(dest: Send) {
+function reliable() {
   const pending = new Map<number, Attempt>()
   const success = new Set<number>()
   let id_ = 0
@@ -25,10 +23,7 @@ function reliable(dest: Send) {
 
   function send(msg: Message) {
     const id = id_++
-
-    // this constructs a send that lets us offer
-    // a capability to synchronize
-    const withSyn = offer(dest, {
+    const withSyn = offer({
       [SYN]: _ => {
         if (pending.has(id)) {
           pending.delete(id)
@@ -36,7 +31,7 @@ function reliable(dest: Send) {
         }
       },
     })
-    const attempt = () => withSyn(msg)
+    const attempt = () => withSyn.send(msg)
     pending.set(id, attempt)
     attempt()
   }
@@ -48,13 +43,12 @@ function reliable(dest: Send) {
   }
 }
 
-const receiver = unreliable(
-  // this constructs a send
-  // that can act on SYN capabilities
+unreliable.to(
   accept({
-    [SYN]: ack => ack({}),
+    [SYN]: (msg, ack) => ack({}),
   })
 )
+
 const sender = reliable(receiver)
 
 console.log('initial send started')

@@ -9,11 +9,11 @@
 * Introduction
 This literate document contains the source code for the core of [[https://bassline.dev][Bassline]] v2.
 
-Bassline is designed to be hacked on and modified, so we encourage people to read this!
+It is designed to be hacked on and modified, so we encourage people to read this!
 
 ** TLDR
 
-Bassline is a system for partial information programming.
+Bassline is a built for partial information programming.
 
 Programs in Bassline work with incomplete messages. They build local understanding from what they already know while acting on new information.
 
@@ -29,7 +29,6 @@ The model never assumes a closed world, so growth uses the same mechanism as ord
 New message shapes, participants, and behavior do not require a separate extensibility system, they arrive as more messages to interpret.
 
 * The Kernel
-
 The kernel starts with messages and a local capability for communication.
 In this book that capability is implemented with ports, a minimal set of capabilities for communication.
 Keep in mind the important thing is the ability to exchange and observe information, not any particular interface shape.
@@ -45,22 +44,33 @@ The concrete layer shows one minimal JavaScript realization of that shape.
 
 *** Abstractly
 
-Communication is the local capability to receive new information and contribute new information.
-Bassline treats communication as an ongoing process in which participants coordinate by processing messages and inferring enough structure from what they know to continue.
+Communication in Bassline is built from two primitives, =send= and =recv=.
 
-Communication needs a shape that preserves decoupling. Producers should be able to contribute information without needing a fixed understanding of any consumer, and consumers should be able to build their own understanding from the flow they observe.
+1. =send(msg) -> void=
+
+   A "send" is an opaque function that allows us to communicate TO something.
+   We don't know what we are talking to or if it heard us.
+   The only thing we know is that we can say something.
+
+2. =recv() -> Promise<msg>=
+
+   A =recv= is the opposite. It's an opaque function, granting us the ability to observe something locally.
+   Like send it is opaque, just because we can observe something doesn't mean we know where it came from or what it is.
+   All we know is that we see something we didn't before.
+
+So long as these are opaque, it means our programs work in arbitrary environments because they never assumed anything about what they cannot locally see.
 
 *** Concretely
 
-In this book, communication is implemented as ports.
+In this book, communication is implemented with ports.
 
-A port gives us 3 capabilities:
+A port gives us the 2 capabilities discussed above, as well as a =close= capability:
 
-1. =send(aMessage) -> void=
+1. =send(msg) -> void=
 
    Which let's us send a message to something
 
-2. =recv() -> Promise<aMessage>=
+2. =recv() -> Promise<msg>=
 
    Which let's us pull a message from a local buffer, blocking until one is available.
 
@@ -68,7 +78,7 @@ A port gives us 3 capabilities:
 
    To ignore any future messages, stopping communication from our end.
 
-A port is a minimal surface that faithfully implements what we care about from communication.
+A port is a minimal surface that faithfully implements what we care about for communication.
 
 An important thing to note is that there is no builtin lifecycle propagation with ports.
 This is because closing a port is a local decision made when a participant decides they aren't interested anymore, or that the conversation is not useful to them anymore.
@@ -136,9 +146,9 @@ export function propagator(fn = (v, p) => p(v)) {
   let closed = false
   const targets = lazy(() => new Set())
   const propagate = value => targets().forEach(t => t(value))
-  async function send(value) {
+  function send(value) {
     if(closed) return
-    await fn(value, propagate)
+    Promise.resolve(fn(value, propagate))
   }
   function to(...dests) {
     dests.forEach(d => targets().add(d))
@@ -171,7 +181,7 @@ export function cell(merge, init) {
 
 ***** Consume
 
-The most common way to use a port, is inside of an endless async loop that exists when we recv EOF.
+The most common way to use a port, is inside of an endless async loop that exits when we recv EOF.
 
 We define a helper for this called =consume=. It let's us use a recv fn to manage the inputs for a propagator, as well
 as it's lifecycle.
@@ -183,7 +193,7 @@ export function consume(recv, callback) {
     while (true) {
       const msg = await recv()
       if (is.eof(msg)) break
-      await p.send(msg)
+      p.send(msg)
     }
     p.close()
   })()
