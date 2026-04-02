@@ -1,0 +1,19 @@
+{
+  "name": "brain",
+  "description": "description",
+  "version": "1.0.0",
+  "type": "module",
+  "author": "goose",
+  "scripts": {
+    "dev": "vite"
+  },
+  "dependencies": {
+    "@bassline/core": "workspace:*",
+    "cytoscape": "^3.31.0",
+    "cytoscape-cxtmenu": "^3.5.0",
+    "cytoscape-edgehandles": "^4.0.1"
+  },
+  "devDependencies": {
+    "vite": "^6.0.0"
+  }
+}
