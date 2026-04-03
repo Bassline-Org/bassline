@@ -1,4 +1,4 @@
-import { LitElement, html, css } from 'lit'
+import { LitElement, html } from 'lit'
 import './node-form.js'
 
 export class BrainSidebar extends LitElement {
@@ -6,40 +6,6 @@ export class BrainSidebar extends LitElement {
     cy: { attribute: false },
     _node: { attribute: false },
   }
-
-  static styles = css`
-    :host {
-      display: block;
-      position: absolute;
-      top: 16px;
-      right: 16px;
-      min-width: 220px;
-      padding: 16px;
-      background: #1e1e2eee;
-      border: 1px solid #333;
-      border-radius: 8px;
-      font-family:
-        system-ui,
-        -apple-system,
-        sans-serif;
-      z-index: 10;
-    }
-
-    .empty {
-      color: #666;
-      font-size: 13px;
-      margin: 0;
-    }
-
-    h3 {
-      margin: 0 0 16px 0;
-      font-size: 13px;
-      font-weight: 500;
-      color: #888;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-  `
 
   _setup() {
     if (!this.cy) return
