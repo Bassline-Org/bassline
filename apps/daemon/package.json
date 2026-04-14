@@ -1,0 +1,13 @@
+{
+  "name": "@bassline/daemon",
+  "version": "0.0.1",
+  "scripts": {
+    "test": "vitest run",
+    "start": "node daemon.js"
+  },
+  "type": "module",
+  "dependencies": {
+    "@bassline/core": "workspace:*",
+    "cytoscape": "^3.33.2"
+  }
+}
