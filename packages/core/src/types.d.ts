@@ -98,10 +98,6 @@ export interface Ctl {
   closes(...controllers: Array<Ctl & { close: Close }>): void
 }
 export function createController(): { close: Close; ctl: Ctl }
-export function cap<T extends (...args: unknown[]) => unknown>(
-  ctl: Ctl,
-  fn: T
-): Revocable<T>
 
 // frame stuff
 export function fromWebSocket(ws: unknown): Port<Message>

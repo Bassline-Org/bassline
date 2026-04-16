@@ -32,18 +32,6 @@ export const lazy = fn => {
   }
 }
 
-export function cap(ctl, aFn) {
-  if (!is.fn(aFn)) {
-    throw new Error('invalid cap, must be a function!')
-  }
-  let fn = aFn
-  ctl.onClose(() => (fn = null))
-  return function (...args) {
-    if (fn === null) return
-    return fn(...args)
-  }
-}
-
 export function createController() {
   const controller = new AbortController()
   const signal = controller.signal
@@ -57,7 +45,17 @@ export function createController() {
         ctl.onClose(() => c.close(), c?.ctl?.signal)
       }
     },
-    cap: fn => cap(ctl, fn),
+    cap(aFn) {
+      if (!is.fn(aFn)) {
+        throw new Error('invalid cap, must be a function!')
+      }
+      let fn = aFn
+      ctl.onClose(() => (fn = null))
+      return function (...args) {
+        if (fn === null) return
+        return fn(...args)
+      }
+    },
     get closed() {
       return signal.aborted
     },
