@@ -88,12 +88,12 @@ export const is: {
   msg: Shaped<Message>
 }
 export function delay(ms: number): Promise<void>
-
 export function lazy<T>(fn: () => T): () => T
+
 export interface Ctl {
   closed: boolean
   signal: AbortSignal
-  cap<T extends (...args: unknown[]) => unknown>(fn: T): Revocable<T>
+  fn<T extends (...args: unknown[]) => unknown>(aFn: T): Revocable<T>
   onClose(fn: () => void, signal?: AbortSignal): void
   closes(...controllers: Array<Ctl & { close: Close }>): void
 }

@@ -137,7 +137,7 @@ local consumer we are closed.
       for (const w of waiters) w(EOF)
       waiters.length = 0
     })
-    const send = ctl.cap(msg => {
+    const send = ctl.fn(msg => {
       if (is.eof(msg)) throw new Error('Bassline EOF is reserved')
       // resolve the promise if we have a waiter
       if (waiters.length > 0) return waiters.shift()(msg)
@@ -171,10 +171,10 @@ setup your propagators to ignore irrelevant information.
     const targets = lazy(() => new Set())
     const propagate = value => targets().forEach(t => t(value))
     ctl.onClose(() => targets().clear())
-    const send = ctl.cap(val => {
+    const send = ctl.fn(val => {
       Promise.resolve(fn(val, propagate))
     })
-    const to = ctl.cap((...dests) => {
+    const to = ctl.fn((...dests) => {
       dests.forEach(d => targets().add(d))
       return () => dests.forEach(d => targets().delete(d))
     })
@@ -246,10 +246,10 @@ single participant, even if they are totally unaware of each other.
     const ports = new Set()
     const nc = createController()
 
-    const join = nc.ctl.cap(size => {
+    const join = nc.ctl.fn(size => {
       const fromNet = port(size)
       const { recv, ctl, close } = fromNet
-      const send = ctl.cap(msg => {
+      const send = ctl.fn(msg => {
         ports.forEach(p => p !== fromNet && p.send(msg))
       })
       ports.add(fromNet)
@@ -258,7 +258,7 @@ single participant, even if they are totally unaware of each other.
       return { recv, ctl, close, send }
     })
 
-    const send = nc.ctl.cap(msg => ports.forEach(p => p.send(msg)))
+    const send = nc.ctl.fn(msg => ports.forEach(p => p.send(msg)))
 
     return { join, send, ctl: nc.ctl, close: nc.close }
   }
@@ -479,18 +479,12 @@ the socket.
     socket.on('end', close)
     socket.on('error', close)
 
-    ctl.onClose(() => {
-      raw.close()
-      msgs.close()
-      socket.destroy()
-    })
+    ctl.closes(raw, msgs)
+    ctl.onClose(() => socket.destroy())
 
-    return {
-      recv: msgs.recv,
-      send: msg => void(socket.write(frame.format(msg))),
-      ctl,
-      close,
-    }
+    const send = ctl.fn(msg => void(socket.write(frame.format(msg))))
+
+    return { send, recv: msgs.recv, ctl, close }
   }
 
   export function connect(options = {}, frame = defaultFrame) {
@@ -510,23 +504,23 @@ connections. Each connection is itself a port, produced by
 #+begin_src js
   import nodeNet from 'node:net'
   import { fromSocket } from '../transports/socket.js'
-  import { port } from '../bassline.js'
+  import { port, createController } from '../bassline.js'
   import defaultFrame from '../frame/jsonl.js'
 
   export function serve(options = {}, frame = defaultFrame) {
+    const { ctl, close } = createController()
     const p = port()
-    const { recv, close, ctl } = p
     const server = nodeNet.createServer(socket => {
       const clientPort = fromSocket(socket, frame)
       ctl.closes(clientPort)
       p.send(clientPort)
     })
 
-    ctl.closes(server)
+    ctl.closes(server, p)
     server.listen(options)
     server.on('close', close)
     server.on('error', close)
-    return { connections: recv, recv, server, close, ctl }
+    return { connections: p.recv, recv: p.recv, server, close, ctl }
   }
 #+end_src
 
@@ -542,18 +536,20 @@ core.
 
 #+begin_src js
   import { fromWebSocket } from '../transports/websocket.js'
-  import { port } from '../bassline.js'
+  import { port, createController } from '../bassline.js'
 
   export function serve(wss) {
-    const { send, ctl, close, recv } = port()
+    const { ctl, close } = createController()
+    const p = port()
+    ctl.closes(p, wss)
     wss.on('connection', ws => {
       const client = fromWebSocket(ws)
       ctl.closes(client)
-      send(client)
+      p.send(client)
     })
     wss.on('close', close)
     wss.on('error', close)
-    return { recv, wss, ctl, close }
+    return { recv: p.recv, wss, ctl, close }
   }
 #+end_src
 
@@ -583,7 +579,7 @@ native =WebSocket=, in Node.js with the =ws= package, and for
     ws.addEventListener('close', close)
     ws.addEventListener('error', close)
     ctl.closes(ws, p)
-    const send = msg => void(ws.send(JSON.stringify(msg)))
+    const send = ctl.fn(msg => void(ws.send(JSON.stringify(msg))))
 
     return { recv: p.recv, send, ctl, close }
   }
@@ -607,7 +603,7 @@ clone. Objects cross the boundary without serialization. Works with
     messagePort.onmessage = e => p.send(message(e.data))
     messagePort.onmessageerror = () => close()
     ctl.closes(p)
-    const send = msg => messagePort.postMessage(msg)
+    const send = ctl.fn(msg => messagePort.postMessage(msg))
     return { send, recv: p.recv, ctl, close }
   }
 #+end_src
@@ -622,26 +618,24 @@ produce a port of messages.
 
 #+begin_src js
   import readline from 'node:readline'
-  import { port } from '../bassline.js'
+  import { port, createController } from '../bassline.js'
   import defaultFrame from '../frame/jsonl.js'
 
   export function fromStdio(frame = defaultFrame) {
+    const { ctl, close } = createController()
     const raw = port()
     const msgs = port()
     const rl = readline.createInterface({ input: process.stdin })
 
-    const { ctl, close } = raw
-    const { recv } = msgs
-    const send = msg => process.stdout.write(frame.format(msg))
+    const send = ctl.fn(msg => process.stdout.write(frame.format(msg)))
 
-    ctl.closes(msgs, rl)
+    ctl.closes(raw, msgs, rl)
 
     rl.on('line', line => raw.send(line + '\n'))
-    rl.on('close', () => raw.close())
-
+    rl.on('close', close)
     frame.read(raw.recv).to(msgs.send)
 
-    return {recv, send, ctl, close}
+    return {recv: msgs.recv, send, ctl, close}
   }
 #+end_src
 
@@ -650,7 +644,7 @@ produce a port of messages.
 #+name: utils-omitted
 #+begin_src js
   export const EOF = Symbol.for('$$BASSLINE_EOF$$')
-  function kindOf(v) {
+  export function kindOf(v) {
     if (v === null) return 'null'
     if (v === undefined) return 'undefined'
     if (v instanceof Promise) return 'promise'
@@ -697,16 +691,13 @@ produce a port of messages.
           ctl.onClose(() => c.close(), c?.ctl?.signal)
         }
       },
-      cap(aFn) {
+      fn(aFn) {
         if (!is.fn(aFn)) {
-          throw new Error('invalid cap, must be a function!')
+          throw new Error('ctl.fn: must pass a function!')
         }
-        let fn = aFn
-        ctl.onClose(() => fn = null)
-        return function(...args) {
-          if (fn === null) return
-          return fn(...args)
-        }
+        let ref = aFn
+        ctl.onClose(() => ref = null)
+        return (...args) => ref?.(...args)
       },
       get closed() {
         return signal.aborted

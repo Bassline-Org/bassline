@@ -13,7 +13,7 @@ export function fromWebSocket(ws) {
   ws.addEventListener('close', close)
   ws.addEventListener('error', close)
   ctl.closes(ws, p)
-  const send = msg => void ws.send(JSON.stringify(msg))
+  const send = ctl.fn(msg => void ws.send(JSON.stringify(msg)))
 
   return { recv: p.recv, send, ctl, close }
 }

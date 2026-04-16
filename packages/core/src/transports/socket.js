@@ -13,18 +13,12 @@ export function fromSocket(socket, frame = defaultFrame) {
   socket.on('end', close)
   socket.on('error', close)
 
-  ctl.onClose(() => {
-    raw.close()
-    msgs.close()
-    socket.destroy()
-  })
+  ctl.closes(raw, msgs)
+  ctl.onClose(() => socket.destroy())
 
-  return {
-    recv: msgs.recv,
-    send: msg => void socket.write(frame.format(msg)),
-    ctl,
-    close,
-  }
+  const send = ctl.fn(msg => void socket.write(frame.format(msg)))
+
+  return { send, recv: msgs.recv, ctl, close }
 }
 
 export function connect(options = {}, frame = defaultFrame) {

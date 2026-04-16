@@ -1,5 +1,5 @@
 export const EOF = Symbol.for('$$BASSLINE_EOF$$')
-function kindOf(v) {
+export function kindOf(v) {
   if (v === null) return 'null'
   if (v === undefined) return 'undefined'
   if (v instanceof Promise) return 'promise'
@@ -45,16 +45,13 @@ export function createController() {
         ctl.onClose(() => c.close(), c?.ctl?.signal)
       }
     },
-    cap(aFn) {
+    fn(aFn) {
       if (!is.fn(aFn)) {
-        throw new Error('invalid cap, must be a function!')
+        throw new Error('ctl.fn: must pass a function!')
       }
-      let fn = aFn
-      ctl.onClose(() => (fn = null))
-      return function (...args) {
-        if (fn === null) return
-        return fn(...args)
-      }
+      let ref = aFn
+      ctl.onClose(() => (ref = null))
+      return (...args) => ref?.(...args)
     },
     get closed() {
       return signal.aborted
@@ -77,7 +74,7 @@ export function port(size = Infinity) {
     for (const w of waiters) w(EOF)
     waiters.length = 0
   })
-  const send = ctl.cap(msg => {
+  const send = ctl.fn(msg => {
     if (is.eof(msg)) throw new Error('Bassline EOF is reserved')
     // resolve the promise if we have a waiter
     if (waiters.length > 0) return waiters.shift()(msg)
@@ -99,10 +96,10 @@ export function propagator(fn = (v, p) => p(v)) {
   const targets = lazy(() => new Set())
   const propagate = value => targets().forEach(t => t(value))
   ctl.onClose(() => targets().clear())
-  const send = ctl.cap(val => {
+  const send = ctl.fn(val => {
     Promise.resolve(fn(val, propagate))
   })
-  const to = ctl.cap((...dests) => {
+  const to = ctl.fn((...dests) => {
     dests.forEach(d => targets().add(d))
     return () => dests.forEach(d => targets().delete(d))
   })
@@ -138,10 +135,10 @@ export function net() {
   const ports = new Set()
   const nc = createController()
 
-  const join = nc.ctl.cap(size => {
+  const join = nc.ctl.fn(size => {
     const fromNet = port(size)
     const { recv, ctl, close } = fromNet
-    const send = ctl.cap(msg => {
+    const send = ctl.fn(msg => {
       ports.forEach(p => p !== fromNet && p.send(msg))
     })
     ports.add(fromNet)
@@ -150,7 +147,7 @@ export function net() {
     return { recv, ctl, close, send }
   })
 
-  const send = nc.ctl.cap(msg => ports.forEach(p => p.send(msg)))
+  const send = nc.ctl.fn(msg => ports.forEach(p => p.send(msg)))
 
   return { join, send, ctl: nc.ctl, close: nc.close }
 }
