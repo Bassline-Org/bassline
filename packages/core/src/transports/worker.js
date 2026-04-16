@@ -5,7 +5,7 @@ export function fromPort(messagePort) {
   const p = port()
   messagePort.onmessage = e => p.send(message(e.data))
   messagePort.onmessageerror = () => close()
-  ctl.closes(p)
+  ctl.closes(p, messagePort)
   const send = ctl.fn(msg => messagePort.postMessage(msg))
   return { send, recv: p.recv, ctl, close }
 }

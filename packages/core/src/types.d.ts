@@ -42,9 +42,9 @@ export function consume<T = Message>(recv: Recv<T>): Consume<T>
 export function consume<T = Message, K = T>(
   recv: Recv<T>,
   callback: PropagateFn<T, K>
-): Consume<T>
-type Consume<T> = {
-  to: Propagator<T>['to']
+): Consume<T, K>
+type Consume<T, K = T> = {
+  to: Propagator<T, K>['to']
   promise: Promise<void>
   ctl: Ctl
   close: Close
@@ -82,7 +82,7 @@ export const is: {
   number: Shaped<number>
   string: Shaped<string>
   fn: Shaped<Function>
-  symbol: Shaped<Symbol>
+  symbol: Shaped<symbol>
   array: Shaped<Array<unknown>>
   object: Shaped<Exclude<object, null>>
   msg: Shaped<Message>
@@ -101,11 +101,10 @@ export function createController(): { close: Close; ctl: Ctl }
 
 // frame stuff
 export function fromWebSocket(ws: unknown): Port<Message>
-export function fromPort(port: unknown): Port<Message>
-export function readFrame(
-  recv: () => Promise<unknown>,
-  send: (msg: Message) => void
-): void
+export function fromPort(messagePort: unknown): Port<Message>
+export function readFrame<T = unknown, K extends Message = Message>(
+  recv: Recv<T>
+): Consume<T, K>
 export function format(msg: unknown): string
 
 // General Helper Types
