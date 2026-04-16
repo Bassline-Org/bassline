@@ -15,27 +15,36 @@ It is designed to be hacked on and modified, so we encourage people to read this
 
 Bassline is a built for partial information programming.
 
-Programs in Bassline work with incomplete messages. They build local understanding from what they already know while acting on new information.
+Programs in Bassline work with incomplete messages. They build local
+understanding from what they already know while acting on new information.
 
-Anything outside your local perspective is encountered through communication.
-When that communication yields information that matters, we observe it as a resource.
-We do not need a complete account of what it is, where it is, or how it produces what we receive.
+Anything outside your local perspective is encountered through
+communication.  When that communication yields information that
+matters, we observe it as a resource.  We do not need a complete
+account of what it is, where it is, or how it produces what we
+receive.
 
-Identity, location, provenance, timing, and order are therefore not taken as settled facts.
-They are local judgments made from partial information.
-Different participants may have different grounds for believing them, and that is good.
+Identity, location, provenance, timing, and order are therefore not
+taken as settled facts.  They are local judgments made from partial
+information.  Different participants may have different grounds for
+believing them, and that is good.
 
-The model never assumes a closed world, so growth uses the same mechanism as ordinary operation.
-New message shapes, participants, and behavior do not require a separate extensibility system, they arrive as more messages to interpret.
+The model never assumes a closed world, so growth uses the same
+mechanism as ordinary operation.  New message shapes, participants,
+and behavior do not require a separate extensibility system, they
+arrive as more messages to interpret.
 
 * The Kernel
-The kernel starts with messages and a local capability for communication.
-In this book that capability is implemented with ports, a minimal set of capabilities for communication.
-Keep in mind the important thing is the ability to exchange and observe information, not any particular interface shape.
+The kernel starts with messages and a local capability for
+communication.  In this book that capability is implemented with
+ports, a minimal set of capabilities for communication.  Keep in mind
+the important thing is the ability to exchange and observe
+information, not any particular interface shape.
 
-For each part of the kernel, we will separate the abstract idea from the concrete implementation used in this book.
-The abstract layer explains what shape of thing we are modeling.
-The concrete layer shows one minimal JavaScript realization of that shape.
+For each part of the kernel, we will separate the abstract idea from
+the concrete implementation used in this book.  The abstract layer
+explains what shape of thing we are modeling.  The concrete layer
+shows one minimal JavaScript realization of that shape.
 
 ** Communication
 :PROPERTIES:
@@ -54,17 +63,22 @@ Communication in Bassline is built from two primitives, =send= and =recv=.
 
 2. =recv() -> Promise<msg>=
 
-   A =recv= is the opposite. It's an opaque function, granting us the ability to observe something locally.
-   Like send it is opaque, just because we can observe something doesn't mean we know where it came from or what it is.
-   All we know is that we see something we didn't before.
+   A =recv= is the opposite. It's an opaque function, granting us the
+   ability to observe something locally.  Like send it is opaque, just
+   because we can observe something doesn't mean we know where it came
+   from or what it is.  All we know is that we see something we didn't
+   before.
 
-So long as these are opaque, it means our programs work in arbitrary environments because they never assumed anything about what they cannot locally see.
+So long as these are opaque, it means our programs work in arbitrary
+environments because they never assumed anything about what they
+cannot locally see.
 
 *** Concretely
 
 In this book, communication is implemented with ports.
 
-A port gives us the 2 capabilities discussed above, as well as a =close= capability:
+A port gives us the 2 capabilities discussed above, as well as a
+=close= capability:
 
 1. =send(msg) -> void=
 
@@ -72,94 +86,102 @@ A port gives us the 2 capabilities discussed above, as well as a =close= capabil
 
 2. =recv() -> Promise<msg>=
 
-   Which let's us pull a message from a local buffer, blocking until one is available.
+   Which let's us pull a message from a local buffer, blocking until
+   one is available.
 
 3. =close() -> void=
 
    To ignore any future messages, stopping communication from our end.
 
-A port is a minimal surface that faithfully implements what we care about for communication.
+A port is a minimal surface that faithfully implements what we care
+about for communication.
 
-An important thing to note is that there is no builtin lifecycle propagation with ports.
-This is because closing a port is a local decision made when a participant decides they aren't interested anymore, or that the conversation is not useful to them anymore.
+An important thing to note is that there is no builtin lifecycle
+propagation with ports.  This is because closing a port is a local
+decision made when a participant decides they aren't interested
+anymore, or that the conversation is not useful to them anymore.
 
-Senders are not notified and their messages are dropped should they send to the closed port.
-This ensures neither side requires knowledge of the other's state / status without the other side explicitly sharing this.
+Senders are not notified and their messages are dropped should they
+send to the closed port.  This ensures neither side requires knowledge
+of the other's state / status without the other side explicitly
+sharing this.
 
 **** Port implementation
 
 The port implementation is rather simple.
 
-It maintains a buffer for messages, and a queue of promises to resolve.
-We can give the buffer a fixed capacity, in which it will act as a sliding buffer, dropping the oldest messages.
-Or if we give it a capacity of 0, it will not buffer any messages, requiring a listener actively be waiting for a message, dropping all others.
+It maintains a buffer for messages, and a queue of promises to
+resolve.  We can give the buffer a fixed capacity, in which it will
+act as a sliding buffer, dropping the oldest messages.  Or if we give
+it a capacity of 0, it will not buffer any messages, requiring a
+listener actively be waiting for a message, dropping all others.
 
 The only other thing to note is the local convenience of EOF.
 
-EOF is a symbol sent through and used by local port consumers to indicate that the port closed.
-It is not universal and will serialize over the wire meaningfully.
-It only exists to make our lives simpler in js.
-And it is trivial to build your own interpretation of what should signal EOF locally.
+EOF is a symbol sent through and used by local port consumers to
+indicate that the port closed.  It is not universal and will serialize
+over the wire meaningfully.  It only exists to make our lives simpler
+in js.  And it is trivial to build your own interpretation of what
+should signal EOF locally.
 
-You cannot send EOF directly through a port, nor should you ever have to.
-It should only be created internally inside of a port to notify a local consumer we are closed.
+You cannot send EOF directly through a port, nor should you ever have
+to.  It should only be created internally inside of a port to notify a
+local consumer we are closed.
 
 #+begin_src js :noweb no-export
-<<utils-omitted>>
-export function port(size = Infinity) {
-  const buffer = [], waiters = []
-  let closed = false
-  function close() {
-    closed = true
-    for (const w of waiters) w(EOF)
-    waiters.length = 0
+  <<utils-omitted>>
+  export function port(size = Infinity) {
+    const buffer = [], waiters = []
+    const {close, ctl} = createController()
+    ctl.onClose(() => {
+      for (const w of waiters) w(EOF)
+      waiters.length = 0
+    })
+    function send(msg) {
+      if (is.eof(msg)) throw new Error('Bassline EOF is reserved')
+      if (ctl.closed) return
+      // resolve the promise if we have a waiter
+      if (waiters.length > 0) return waiters.shift()(msg)
+      // drop a message if we are over capabity
+      if (buffer.length >= size) buffer.shift()
+      // add the message to the buffer if we have capacity
+      if (size > 0) buffer.push(msg)
+    }
+    function recv() {
+      if (buffer.length > 0) return Promise.resolve(buffer.shift())
+      if (ctl.closed) return Promise.resolve(EOF)
+      return new Promise(resolve => waiters.push(resolve))
+    }
+    return { send, recv, close, ctl }
   }
-  function send(msg) {
-    if (is.eof(msg)) throw new Error('Bassline EOF is reserved')
-    if (closed) return
-    // resolve the promise if we have a waiter
-    if (waiters.length > 0) return waiters.shift()(msg)
-    // drop a message if we are over capabity
-    if (buffer.length >= size) buffer.shift()
-    // add the message to the buffer if we have capacity
-    if (size > 0) buffer.push(msg)
-  }
-  function recv() {
-    if (buffer.length > 0) return Promise.resolve(buffer.shift())
-    if (closed) return Promise.resolve(EOF)
-    return new Promise(resolve => waiters.push(resolve))
-  }
-  return { send, recv, close }
-}
 #+end_src
 
 **** Port usage
 
 ***** Propagator
 
-A propagator let's us define something that can selectively propagate interesting messages to multiple targets.
+A propagator let's us define something that can selectively propagate
+interesting messages to multiple targets.
 
-Cycles are supported and encouraged, just make sure you correctly setup your propagators to ignore irrelevant information.
+Cycles are supported and encouraged, just make sure you correctly
+setup your propagators to ignore irrelevant information.
 
 #+begin_src js
-export function propagator(fn = (v, p) => p(v)) {
-  let closed = false
-  const targets = lazy(() => new Set())
-  const propagate = value => targets().forEach(t => t(value))
-  function send(value) {
-    if(closed) return
-    Promise.resolve(fn(value, propagate))
+  export function propagator(fn = (v, p) => p(v)) {
+    const {close, ctl} = createController()
+    const targets = lazy(() => new Set())
+    const propagate = value => targets().forEach(t => t(value))
+    ctl.onClose(() => targets().clear())
+    function send(value) {
+      if(closed) return
+      Promise.resolve(fn(value, propagate))
+    }
+    function to(...dests) {
+      dests.forEach(d => targets().add(d))
+      return () => dests.forEach(d => targets().delete(d))
+    }
+    return { send, to, close, ctl }
   }
-  function to(...dests) {
-    dests.forEach(d => targets().add(d))
-    return () => dests.forEach(d => targets().delete(d))
-  }
-  function close() {
-    closed = true
-    targets().clear()
-  }
-  return { send, to, close }
-}
 #+end_src
 
 ***** Cell
@@ -169,80 +191,92 @@ A propagator with state
 #+begin_src js
 export function cell(merge, init) {
   let current = init
-  const {send, to, close} = propagator((incoming, propagate) => {
+  const {send, to, close, ctl} = propagator((incoming, propagate) => {
     merge(current, incoming, value => {
       current = value
       propagate(value)
     })
   })
-  return { send, to, close, value: () => current }
+  return { send, to, close, ctl, value: () => current }
 }
 #+end_src
 
 ***** Consume
 
-The most common way to use a port, is inside of an endless async loop that exits when we recv EOF.
-
-We define a helper for this called =consume=. It let's us use a recv fn to manage the inputs for a propagator, as well
-as it's lifecycle.
+The most common way to use a port, is inside of an endless async loop
+that exits when we recv EOF. We define a helper for this called
+=consume=. It let's us use a recv fn to manage the inputs for a
+propagator, as well as it's lifecycle.
 
 #+begin_src js
-export function consume(recv, callback) {
-  const p = propagator(callback)
-  const promise = (async () => {
-    while (true) {
-      const msg = await recv()
-      if (is.eof(msg)) break
-      p.send(msg)
-    }
-    p.close()
-  })()
-  return { to: p.to, promise }
-}
+  export function consume(recv, callback) {
+    const {send, to, ctl, close} = propagator(callback)
+    const promise = (async () => {
+      while (true) {
+        const msg = await recv()
+        if (is.eof(msg) || ctl.closed) break
+        send(msg)
+      }
+      close()
+    })()
+    return { to, ctl, close, promise }
+  }
 #+end_src
 
 **** Nets
-Current our ports look like "point-to-point" communication, however in Bassline we don't talk to "something", we observe information from our perspective, and send through opaque handles.
+
+Current our ports look like "point-to-point" communication, however in
+Bassline we don't talk to "something", we observe information from our
+perspective, and send through opaque handles.
 
 This let's us do some neat things when it comes to communication.
 
 For example, a common structure we use is a =net=.
 
-A =net= is a local structure that gives us ports backed by any number of things.
-Meaning that we build a compound communication interface without the consumers or producers ever knowing directly.
-They might be able to tell if they see more information, but they can never know for sure.
+A =net= is a local structure that gives us ports backed by any number
+of things.  Meaning that we build a compound communication interface
+without the consumers or producers ever knowing directly.  They might
+be able to tell if they see more information, but they can never know
+for sure.
 
-This highlights that in bassline cooperating participants appear as a single participant, even if they are totally unaware of each other.
+This highlights that in bassline cooperating participants appear as a
+single participant, even if they are totally unaware of each other.
 
 #+begin_src js
-export function net() {
-  const ports = new Set()
-  function join(size) {
-    const fromNet = port(size)
-    ports.add(fromNet)
-     return {
-      recv: fromNet.recv,
-      send(msg) {
+  export function net() {
+    const ports = new Set()
+    const {ctl, close} = createController()
+
+    function join(size) {
+      if(ctl.closed) throw new Error('closed')
+      const fromNet = port(size)
+      const {recv, ctl, close} = fromNet
+      const toNet = msg => {
+        if(fromNet.ctl.closed) return
         ports.forEach(p => p !== fromNet && p.send(msg))
-      },
-      close() {
-        fromNet.close()
-        ports.delete(fromNet)
-      },
+      }
+      ports.add(fromNet)
+      fromNet.onClose(() => ports.delete(fromNet))
+      return { recv, ctl, close, send: toNet }
     }
+
+    const send = msg => [...ports].forEach(p => p.send(msg))
+
+    ctl.onClose(() => [...ports].forEach(p => p.close()))
+
+    return { join, send, ctl, close }
   }
-  join.close = () => [...ports].forEach(p => p.close())
-  join.send = msg => [...ports].forEach(p => p.send(msg))
-  return join
-}
 #+end_src
 
 **** Communication without input
 Not all communication take input.
 
-A clock is an example of a one-sided communication participant, it can say things, but will never listen.
+A clock is an example of a one-sided communication participant, it can
+say things, but will never listen.
 
-It can be used with anything that wants a capability to receive information, and can be used for local chron jobs, scheduling, and similar things.
+It can be used with anything that wants a capability to receive
+information, and can be used for local chron jobs, scheduling, and
+similar things.
 
 #+begin_src js :tangle no
 export function clock(ms = 1000, eager = true) {
@@ -265,34 +299,50 @@ export function clock(ms = 1000, eager = true) {
 :END:
 *** Abstractly
 
-A message is a fragment of partial information. It is whatever can be locally held, passed around, inspected, and combined without requiring a complete picture of the world.
+A message is a fragment of partial information. It is whatever can be
+locally held, passed around, inspected, and combined without requiring
+a complete picture of the world.
 
-A message does not come with privileged meaning beyond what participants give it.
-If provenance, correlation, naming, coordination hints, or other structure matters, it lives in the message like any other data.
-Bassline does not want a separate metadata plane that is somehow more real than the information being exchanged.
+A message does not come with privileged meaning beyond what
+participants give it.  If provenance, correlation, naming,
+coordination hints, or other structure matters, it lives in the
+message like any other data.  Bassline does not want a separate
+metadata plane that is somehow more real than the information being
+exchanged.
 
 *Note: The following is a bit of new prose for messages i'm testing*
 
-Messages are data, not "code". They are inert unless interpreted and acted upon.
-Interpreting a message is the local act of "binding" the meaning of message to some local program execution.
+Messages are data, not "code". They are inert unless interpreted and
+acted upon.  Interpreting a message is the local act of "binding" the
+meaning of message to some local program execution.
 
-As such it doesn't violate our model of messaging & communication, if there exists purely local capabilities bound by other local participants, traveling ALONGSIDE the data.
+As such it doesn't violate our model of messaging & communication, if
+there exists purely local capabilities bound by other local
+participants, traveling ALONGSIDE the data.
 
-This is equivalent to ports, we don't care who added these capabilities, but we can observe them and act on them locally.
+This is equivalent to ports, we don't care who added these
+capabilities, but we can observe them and act on them locally.
 
 This isn't possible in all systems, but it's a useful pattern none the less.
 
 The constraints to make this "work" are:
 - capabilities must be allowed to be ignored
-- capabilities must never return values directly, they should be opaque
-- capabilities shouldn't removed data from the message itself, they should only enrich it for those interested
-- capabilities cannot travel over the wire, unless they are reified as a higher order message.
+- capabilities must never return values directly, they should be
+  opaque
+- capabilities shouldn't removed data from the message itself, they
+  should only enrich it for those interested
+- capabilities cannot travel over the wire, unless they are reified as
+  a higher order message.
 
 *** Concretely
 
-A message is a plain object with string keys. It can be empty, partially filled, or nested inside other messages.
+A message is a plain object with string keys. It can be empty,
+partially filled, or nested inside other messages.
 
-The concrete representation is intentionally minimal. Plain objects are open-ended, nest naturally, and are easy to serialize, enrich, and inspect. That keeps the message lightweight and avoids forcing a closed protocol up front.
+The concrete representation is intentionally minimal. Plain objects
+are open-ended, nest naturally, and are easy to serialize, enrich, and
+inspect. That keeps the message lightweight and avoids forcing a
+closed protocol up front.
 
 ***  Simple Messages
 
@@ -311,134 +361,170 @@ export function message(content) {
 
 *** Messages with capabilities
 
-This is a reference implementation of a message with capabilities bound by another participant.
+This is a reference implementation of a message with capabilities
+bound by another participant.
 
-The interesting things to note here are the this allows us to express how a local participant can act on a message, allowing us share a send with a message.
+The interesting things to note here are the this allows us to express
+how a local participant can act on a message, allowing us share a send
+with a message.
 
-This makes messages not just data, but data enhanced with associated behavior through an interaction surface.
+This makes messages not just data, but data enhanced with associated
+behavior through an interaction surface. By closing over a function
+that hides our acceptance criteria, we bind a capability to
+behaviorally test a receiver without ever assuming that the outside
+world exists or is stable.
 
-By closing over a function that hides our acceptance criteria, we bind a capability to behaviorally test a receiver without ever assuming that the outside world exists or is stable.
+For example, we can build TCP like acknowledgement flows. But what's
+interesting is that the receiver of the message, cannot know what the
+final destination / intent of the response will be. This asymmetry
+falls naturally out of the model we have, and is an extremely powerful
+tool for opaquely testing and validating how peers are behaving.
 
-For example, we can build TCP like acknowledgement flows. But what's interesting is that the receiver of the message, cannot know what the final destination / intent of the response will be.
+Consider traditional "challenge" protocols. The person being
+challenged knows that they are being challenged as they are engaging
+in a shared common protocol.
 
-This asymmetry falls naturally out of the model we have, and is an extremely powerful tool for opaquely testing and validating how peers are behaving.
-
-Consider traditional "challenge" protocols. The person being challenged knows that they are being challenged as they are engaging in a shared common protocol.
-
-Whereas if messages carry capabilities, the recipient of a message only sees the capability along with the data, and they never know if the message is a "test", as that's a private perspective only the capability provider knows.
-It also lets them add / remove / replace capabilities as they process and share the messages.
+Whereas if messages carry capabilities, the recipient of a message
+only sees the capability along with the data, and they never know if
+the message is a "test", as that's a private perspective only the
+capability provider knows.  It also lets them add / remove / replace
+capabilities as they process and share the messages.
 
 #+begin_src js
-export const hasCap = (msg, name) => is.defined(msg[name]) && is.fn(msg[name])
+  export const hasCap = (msg, name) => is.defined(msg[name]) && is.fn(msg[name])
 
-export function offer(handlers) {
-  const syms = Object.getOwnPropertySymbols(handlers)
-  return propagator((msg, propagate) => {
-    const enriched = { ...msg }
-    for (const sym of syms) {
-      enriched[sym] = m => void handlers[sym](m)
-    }
-    propagate(enriched)
-  })
-}
+  export function offer(handlers) {
+    const syms = Object.getOwnPropertySymbols(handlers)
+    return propagator((msg, propagate) => {
+      const enriched = { ...msg }
+      for (const sym of syms) {
+        enriched[sym] = m => void handlers[sym](m)
+      }
+      propagate(enriched)
+    })
+  }
 
-export function accept(handlers) {
-  const syms = Object.getOwnPropertySymbols(handlers)
-  return propagator(async (msg, propagate) => {
-    for (const sym of syms) {
-      if (hasCap(msg, sym)) await handlers[sym](msg, msg[sym])
-    }
-    propagate(msg)
-  })
-}
+  export function accept(handlers) {
+    const syms = Object.getOwnPropertySymbols(handlers)
+    return propagator(async (msg, propagate) => {
+      for (const sym of syms) {
+        if (hasCap(msg, sym)) await handlers[sym](msg, msg[sym])
+      }
+      propagate(msg)
+    })
+  }
 #+end_src
 
 * Transports
-As above, it helps to separate the abstract role of a transport from the concrete transport used in this book.
+As above, it helps to separate the abstract role of a transport from
+the concrete transport used in this book.
+
+** TODO This should be cleaned up
 
 ** Abstractly
 
-A transport adapts some external medium into local communication capabilities. This matters because the programming model should not change just because information crossed a process boundary, a machine boundary, or a device boundary. Local and non-local communication differ in mechanics, but they should not require different conceptual tools.
+A transport adapts some external medium into local communication
+capabilities. This matters because the programming model should not
+change just because information crossed a process boundary, a machine
+boundary, or a device boundary. Local and non-local communication
+differ in mechanics, but they should not require different conceptual
+tools.
 
 ** Concretely
 
-Every transport produces the same thing: a port with =send=, =recv=, and =close=. What differs is the medium underneath and whether that medium carries raw bytes or discrete messages.
+Every transport produces the same thing: a port with =send=, =recv=,
+and =close=. What differs is the medium underneath and whether that
+medium carries raw bytes or discrete messages.
 
-Byte transports (TCP sockets, stdio, serial) carry raw chunks. They need a framing layer to delimit and parse messages. Message transports (WebSocket, WebWorker/MessagePort) carry discrete messages natively and skip framing entirely.
+Byte transports (TCP sockets, stdio, serial) carry raw chunks. They
+need a framing layer to delimit and parse messages. Message transports
+(WebSocket, WebWorker/MessagePort) carry discrete messages natively
+and skip framing entirely.
 
 *** Framing
 :PROPERTIES:
 :header-args: :tangle ../src/frame/jsonl.js
 :END:
 
-Framing is separated from any specific transport. =readFrame= bridges a byte-level =recv= to a message-level =send=: it consumes chunks, accumulates them in a buffer, splits on newlines, and emits parsed messages. =format= is a plain function that serializes a message as a JSON line.
+Framing is separated from any specific transport. =readFrame= bridges
+a byte-level =recv= to a message-level =send=: it consumes chunks,
+accumulates them in a buffer, splits on newlines, and emits parsed
+messages. =format= is a plain function that serializes a message as a
+JSON line.
 
 #+begin_src js
-import { message, consume } from '../bassline.js'
+  import { message, consume } from '../bassline.js'
 
-export function readFrame(recv, dest) {
-  let buffer = ''
-  const prop = consume(recv, (chunk, send) => {
-    buffer += chunk
-    let nl
-    while ((nl = buffer.indexOf('\n')) !== -1) {
-      const line = buffer.slice(0, nl)
-      buffer = buffer.slice(nl + 1)
-      if (!line) continue
-      try {
-        send(message(JSON.parse(line)))
-      } catch (e) {
-        console.error('readFrame parse error: ', e)
+  export function readFrame(recv) {
+    let buffer = ''
+    return consume(recv, (chunk, send) => {
+      buffer += chunk
+      let nl
+      while ((nl = buffer.indexOf('\n')) !== -1) {
+        const line = buffer.slice(0, nl)
+        buffer = buffer.slice(nl + 1)
+        if (!line) continue
+        try {
+          send(message(JSON.parse(line)))
+        } catch (e) {
+          console.error('readFrame parse error: ', e)
+        }
       }
-    }
-  })
-  prop.to(dest)
-  return prop
-}
+    })
+  }
 
-export const format = msg => JSON.stringify(msg) + '\n'
+  export const format = msg => JSON.stringify(msg) + '\n'
 
-export default { read: readFrame, format }
+  export default { read: readFrame, format }
 #+end_src
 
-=readFrame= fires off a =consume= loop in the background. One input chunk may produce zero or many messages. =format= is used on the outgoing side to serialize before writing.
+=readFrame= fires off a =consume= loop in the background. One input
+chunk may produce zero or many messages. =format= is used on the
+outgoing side to serialize before writing.
 
 *** Socket
 :PROPERTIES:
 :header-args: :tangle ../src/transports/socket.js
 :END:
 
-A socket is a byte transport. =fromSocket= creates a raw port for byte chunks, a message port for parsed messages, and bridges them through =frame.read=. Outgoing messages are formatted and written directly to the socket.
+A socket is a byte transport. =fromSocket= creates a raw port for byte
+chunks, a message port for parsed messages, and bridges them through
+=frame.read=. Outgoing messages are formatted and written directly to
+the socket.
 
 #+begin_src js
-import net from 'node:net'
-import { port } from '../bassline.js'
-import defaultFrame from '../frame/jsonl.js'
+  import net from 'node:net'
+  import { port, createController } from '../bassline.js'
+  import defaultFrame from '../frame/jsonl.js'
 
-export function fromSocket(socket, frame = defaultFrame) {
-  const raw = port()
-  const msgs = port()
+  export function fromSocket(socket, frame = defaultFrame) {
+    const {close, ctl} = createController()
+    const raw = port()
+    const msgs = port()
+    frame.read(raw.recv).to(msg.send)
 
-  socket.on('data', chunk => raw.send(chunk.toString()))
-  socket.on('close', () => raw.close())
-  socket.on('error', () => raw.close())
+    socket.on('data', chunk => raw.send(chunk.toString()))
+    socket.on('close', close)
+    socket.on('end', close)
+    socket.on('error', close)
 
-  frame.read(raw.recv, msgs.send)
-
-  return {
-    recv: msgs.recv,
-    send: msg => socket.write(frame.format(msg)),
-    close: () => {
-      msgs.close()
+    ctl.onClose(() => {
       raw.close()
+      msgs.close()
       socket.destroy()
-    },
-  }
-}
+    })
 
-export function connect(options = {}, frame = defaultFrame) {
-  return fromSocket(net.createConnection(options), frame)
-}
+    return {
+      recv: msgs.recv,
+      send: msg => void(socket.write(frame.format(msg))),
+      ctl,
+      close,
+    }
+  }
+
+  export function connect(options = {}, frame = defaultFrame) {
+    return fromSocket(net.createConnection(options), frame)
+  }
 #+end_src
 
 *** Serving (TCP)
@@ -446,30 +532,31 @@ export function connect(options = {}, frame = defaultFrame) {
 :header-args: :tangle ../src/serve/tcp.js
 :END:
 
-A TCP server listens on a socket and produces a port of connections. Each connection is itself a port, produced by =fromSocket=.
+A TCP server listens on a socket and produces a port of
+connections. Each connection is itself a port, produced by
+=fromSocket=.
 
 #+begin_src js
-import nodeNet from 'node:net'
-import { fromSocket } from '../transports/socket.js'
-import { port } from '../bassline.js'
+  import nodeNet from 'node:net'
+  import { fromSocket } from '../transports/socket.js'
+  import { port } from '../bassline.js'
+  import defaultFrame from '../frame/jsonl.js'
 
-export function serve(options = {}, frame) {
-  const p = port()
-  const server = nodeNet.createServer(socket => {
-    p.send(fromSocket(socket, frame))
-  })
-  server.listen(options)
-  server.on('close', () => p.close())
-  server.on('error', () => p.close())
-  return {
-    recv: p.recv,
-    close: () => {
-      p.close()
-      server.close()
-    },
-    server,
+  export function serve(options = {}, frame = defaultFrame) {
+    const p = port()
+    const {recv, close, ctl} = p
+    const server = nodeNet.createServer(socket => {
+      const clientPort = fromSocket(socket, frame)
+      ctl.closes(clientPort)
+      p.send(clientPort)
+    })
+
+    ctl.closes(server)
+    server.listen(options)
+    server.on('close', close)
+    server.on('error', close)
+    return { connections: recv, recv, server, close, ctl }
   }
-}
 #+end_src
 
 *** Serving (WebSocket)
@@ -477,26 +564,26 @@ export function serve(options = {}, frame) {
 :header-args: :tangle ../src/serve/ws.js
 :END:
 
-A WebSocket server wraps an existing =WebSocketServer= instance and produces a port of connections, matching the TCP serve API shape. The caller brings their own =WebSocketServer= — no =ws= dependency in core.
+A WebSocket server wraps an existing =WebSocketServer= instance and
+produces a port of connections, matching the TCP serve API shape. The
+caller brings their own =WebSocketServer= — no =ws= dependency in
+core.
 
 #+begin_src js
-import { fromWebSocket } from '../transports/websocket.js'
-import { port } from '../bassline.js'
+  import { fromWebSocket } from '../transports/websocket.js'
+  import { port } from '../bassline.js'
 
-export function serve(wss) {
-  const p = port()
-  wss.on('connection', ws => p.send(fromWebSocket(ws)))
-  wss.on('close', () => p.close())
-  wss.on('error', () => p.close())
-  return {
-    recv: p.recv,
-    close: () => {
-      p.close()
-      wss.close()
-    },
-    wss,
+  export function serve(wss) {
+    const {send, ctl, close, recv} = port()
+    wss.on('connection', ws => {
+      const client = fromWebSocket(ws)
+      ctl.closes(client)
+      send(client)
+    })
+    wss.on('close', close)
+    wss.on('error', close)
+    return { recv, wss, ctl, close }
   }
-}
 #+end_src
 
 *** WebSocket
@@ -504,32 +591,31 @@ export function serve(wss) {
 :header-args: :tangle ../src/transports/websocket.js
 :END:
 
-A WebSocket is a message transport. Each =ws.send()= is one discrete message, so no framing is needed. This works in the browser with native =WebSocket=, in Node.js with the =ws= package, and for =RTCDataChannel= since it has the same event interface.
+A WebSocket is a message transport. Each =ws.send()= is one discrete
+message, so no framing is needed. This works in the browser with
+native =WebSocket=, in Node.js with the =ws= package, and for
+=RTCDataChannel= since it has the same event interface.
 
 #+begin_src js
-import { port, message } from '../bassline.js'
+  import { port, message } from '../bassline.js'
 
-export function fromWebSocket(ws) {
-  const p = port()
-  ws.addEventListener('message', e => {
-    try {
-      p.send(message(JSON.parse(e.data)))
-    } catch (e) {
-      console.error('failed to parse: ', e)
-    }
-  })
-  ws.addEventListener('close', () => p.close())
-  ws.addEventListener('error', () => p.close())
+  export function fromWebSocket(ws) {
+    const p = port()
+    const {recv, ctl, close} = p
+    ws.addEventListener('message', e => {
+      try {
+        p.send(message(JSON.parse(e.data)))
+      } catch (e) {
+        console.error('failed to parse: ', e)
+      }
+    })
+    ws.addEventListener('close', close)
+    ws.addEventListener('error', close)
+    ctl.closes(ws)
+    const send = msg => void(ws.send(JSON.stringify(msg)))
 
-  return {
-    recv: p.recv,
-    send: msg => ws.send(JSON.stringify(msg)),
-    close: () => {
-      p.close()
-      ws.close()
-    },
+    return {recv, send, ctl, close}
   }
-}
 #+end_src
 
 *** WebWorker
@@ -537,22 +623,21 @@ export function fromWebSocket(ws) {
 :header-args: :tangle ../src/transports/worker.js
 :END:
 
-A =MessagePort= is a message transport that uses structured clone. Objects cross the boundary without serialization. Works with =Worker=, =MessagePort=, =SharedWorker.port=, and =BroadcastChannel=.
+A =MessagePort= is a message transport that uses structured
+clone. Objects cross the boundary without serialization. Works with
+=Worker=, =MessagePort=, =SharedWorker.port=, and =BroadcastChannel=.
 
 #+begin_src js
-import { port, message } from '../bassline.js'
+  import { port, message } from '../bassline.js'
 
-export function fromPort(messagePort) {
-  const p = port()
-  messagePort.onmessage = e => p.send(message(e.data))
-  messagePort.onmessageerror = () => p.close()
-
-  return {
-    recv: p.recv,
-    send: msg => messagePort.postMessage(msg),
-    close: () => p.close(),
+  export function fromPort(messagePort) {
+    const p = port()
+    const {recv, ctl, close} = p
+    messagePort.onmessage = e => p.send(message(e.data))
+    messagePort.onmessageerror = () => close()
+    const send = msg => messagePort.postMessage(msg)
+    return { send, recv, ctl, close }
   }
-}
 #+end_src
 
 *** Stdio
@@ -560,75 +645,97 @@ export function fromPort(messagePort) {
 :header-args: :tangle ../src/transports/stdio.js
 :END:
 
-Stdio is a byte transport, like TCP, and uses framing internally to produce a port of messages.
+Stdio is a byte transport, like TCP, and uses framing internally to
+produce a port of messages.
 
 #+begin_src js
-import readline from 'node:readline'
-import { port } from '../bassline.js'
-import defaultFrame from '../frame/jsonl.js'
+  import readline from 'node:readline'
+  import { port } from '../bassline.js'
+  import defaultFrame from '../frame/jsonl.js'
 
-export function fromStdio(frame = defaultFrame) {
-  const raw = port()
-  const msgs = port()
-  const rl = readline.createInterface({ input: process.stdin })
+  export function fromStdio(frame = defaultFrame) {
+    const raw = port()
+    const msgs = port()
+    const rl = readline.createInterface({ input: process.stdin })
 
-  rl.on('line', line => raw.send(line + '\n'))
-  rl.on('close', () => raw.close())
+    const { ctl, close } = raw
+    const { recv } = msgs
+    const send = msg => process.stdout.write(frame.format(msg))
 
-  frame.read(raw.recv, msgs.send)
+    ctl.closes(msgs, rl)
 
-  return {
-    recv: msgs.recv,
-    send: msg => process.stdout.write(frame.format(msg)),
-    close: () => {
-      msgs.close()
-      raw.close()
-      rl.close()
-    },
+    rl.on('line', line => raw.send(line + '\n'))
+    rl.on('close', () => raw.close())
+
+    frame.read(raw.recv).to(msgs.send)
+
+    return {recv, send, ctl, close}
   }
-}
 #+end_src
 
 * Utilities
 
 #+name: utils-omitted
 #+begin_src js
-export const EOF = Symbol.for('$$BASSLINE_EOF$$')
-export function kindOf(v) {
-  if(v === null) return 'null'
-  if(v === undefined) return 'undefined'
-  if(v instanceof Promise) return 'promise'
-  if(Array.isArray(v)) return 'array'
-  return typeof v
-}
-
-const isa = kind => v => kindOf(v) === kind
-export const is = {
-  eof: v => v === EOF,
-  nil: v => v == null,
-  null: isa('null'),
-  undefined: isa('undefined'),
-  defined: v => !(is.undefined(v)),
-  promise: isa('promise'),
-  number: isa('number'),
-  string: isa('string'),
-  fn: isa('function'),
-  symbol: isa('symbol'),
-  array: isa('array'),
-  object: isa('object'),
-  msg: v => is.object(v) && Object.getPrototypeOf(v) === Object.prototype
-}
-
-export const lazy = fn => {
-  let value, called;
-  return () => {
-    if (is.undefined(called))
-      value = fn(), called = true
-    return value
+  export const EOF = Symbol.for('$$BASSLINE_EOF$$')
+  export function kindOf(v) {
+    if(v === null) return 'null'
+    if(v === undefined) return 'undefined'
+    if(v instanceof Promise) return 'promise'
+    if(Array.isArray(v)) return 'array'
+    return typeof v
   }
-}
 
-export const delay = (ms = 1000) => new Promise(res => setTimeout(res, ms))
+  const isa = kind => v => kindOf(v) === kind
+  export const is = {
+    eof: v => v === EOF,
+    nil: v => v == null,
+    null: isa('null'),
+    undefined: isa('undefined'),
+    defined: v => !(is.undefined(v)),
+    promise: isa('promise'),
+    number: isa('number'),
+    string: isa('string'),
+    fn: isa('function'),
+    symbol: isa('symbol'),
+    array: isa('array'),
+    object: isa('object'),
+    msg: v => is.object(v) && Object.getPrototypeOf(v) === Object.prototype
+  }
+
+  export const lazy = fn => {
+    let value, called;
+    return () => {
+      if (is.undefined(called))
+        value = fn(), called = true
+      return value
+    }
+  }
+
+  export function createController() {
+    const controller = new AbortController()
+    const signal = controller.signal
+    const ctl = {
+      onClose(fn, aSignal) {
+        if(ctl.closed) return void(fn())
+        signal.addEventListener('abort', fn, {once: true, signal: aSignal})
+      },
+      closes(...controllers) {
+        ctl.onClose(() => controllers.forEach(c => c.close))
+      },
+      get closed() {
+        return signal.aborted
+      },
+      signal,
+    }
+    function close(reason = 'closed') {
+      if(ctl.closed) return
+      controller.abort(reason)
+    }
+    return {close, ctl}
+  }
+
+  export const delay = (ms = 1000) => new Promise(res => setTimeout(res, ms))
 #+end_src
 
 #+BEGIN_EXPORT html
