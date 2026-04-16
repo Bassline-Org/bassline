@@ -104,11 +104,10 @@ export function propagator(fn = (v, p) => p(v)) {
   const send = ctl.cap(val => {
     Promise.resolve(fn(val, propagate))
   })
-  function to(...dests) {
-    if (ctl.closed) return () => {}
+  const to = ctl.cap((...dests) => {
     dests.forEach(d => targets().add(d))
     return () => dests.forEach(d => targets().delete(d))
-  }
+  })
   return { send, to, close, ctl }
 }
 

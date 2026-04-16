@@ -1,8 +1,8 @@
-import { port, message } from '../bassline.js'
+import { port, message, createController } from '../bassline.js'
 
 export function fromWebSocket(ws) {
+  const { ctl, close } = createController()
   const p = port()
-  const { recv, ctl, close } = p
   ws.addEventListener('message', e => {
     try {
       p.send(message(JSON.parse(e.data)))
@@ -12,8 +12,8 @@ export function fromWebSocket(ws) {
   })
   ws.addEventListener('close', close)
   ws.addEventListener('error', close)
-  ctl.closes(ws)
+  ctl.closes(ws, p)
   const send = msg => void ws.send(JSON.stringify(msg))
 
-  return { recv, send, ctl, close }
+  return { recv: p.recv, send, ctl, close }
 }

@@ -167,18 +167,17 @@ setup your propagators to ignore irrelevant information.
 
 #+begin_src js
   export function propagator(fn = (v, p) => p(v)) {
-    const {close, ctl} = createController()
+    const { close, ctl } = createController()
     const targets = lazy(() => new Set())
     const propagate = value => targets().forEach(t => t(value))
     ctl.onClose(() => targets().clear())
     const send = ctl.cap(val => {
       Promise.resolve(fn(val, propagate))
     })
-    function to(...dests) {
-      if(ctl.closed) return (() => {})
+    const to = ctl.cap((...dests) => {
       dests.forEach(d => targets().add(d))
       return () => dests.forEach(d => targets().delete(d))
-    }
+    })
     return { send, to, close, ctl }
   }
 #+end_src
@@ -190,7 +189,7 @@ A propagator with state
 #+begin_src js
   export function cell(merge, init) {
     let current = init
-    const {send, to, close, ctl} = propagator((incoming, propagate) => {
+    const { send, to, close, ctl } = propagator((incoming, propagate) => {
       merge(current, incoming, value => {
         current = value
         propagate(value)
@@ -209,7 +208,7 @@ propagator, as well as it's lifecycle.
 
 #+begin_src js
   export function consume(recv, callback) {
-    const {send, to, ctl, close} = propagator(callback)
+    const { send, to, ctl, close } = propagator(callback)
     const promise = (async () => {
       const closed = new Promise(resolve => ctl.onClose(() => resolve(EOF)))
       while (!ctl.closed) {
@@ -249,7 +248,7 @@ single participant, even if they are totally unaware of each other.
 
     const join = nc.ctl.cap(size => {
       const fromNet = port(size)
-      const {recv, ctl, close} = fromNet
+      const { recv, ctl, close } = fromNet
       const send = ctl.cap(msg => {
         ports.forEach(p => p !== fromNet && p.send(msg))
       })
@@ -470,7 +469,7 @@ the socket.
   import defaultFrame from '../frame/jsonl.js'
 
   export function fromSocket(socket, frame = defaultFrame) {
-    const {close, ctl} = createController()
+    const { close, ctl } = createController()
     const raw = port()
     const msgs = port()
     frame.read(raw.recv).to(msgs.send)
@@ -516,7 +515,7 @@ connections. Each connection is itself a port, produced by
 
   export function serve(options = {}, frame = defaultFrame) {
     const p = port()
-    const {recv, close, ctl} = p
+    const { recv, close, ctl } = p
     const server = nodeNet.createServer(socket => {
       const clientPort = fromSocket(socket, frame)
       ctl.closes(clientPort)
@@ -546,7 +545,7 @@ core.
   import { port } from '../bassline.js'
 
   export function serve(wss) {
-    const {send, ctl, close, recv} = port()
+    const { send, ctl, close, recv } = port()
     wss.on('connection', ws => {
       const client = fromWebSocket(ws)
       ctl.closes(client)
@@ -569,11 +568,11 @@ native =WebSocket=, in Node.js with the =ws= package, and for
 =RTCDataChannel= since it has the same event interface.
 
 #+begin_src js
-  import { port, message } from '../bassline.js'
+  import { port, message, createController } from '../bassline.js'
 
   export function fromWebSocket(ws) {
+    const { ctl, close } = createController()
     const p = port()
-    const {recv, ctl, close} = p
     ws.addEventListener('message', e => {
       try {
         p.send(message(JSON.parse(e.data)))
@@ -583,10 +582,10 @@ native =WebSocket=, in Node.js with the =ws= package, and for
     })
     ws.addEventListener('close', close)
     ws.addEventListener('error', close)
-    ctl.closes(ws)
+    ctl.closes(ws, p)
     const send = msg => void(ws.send(JSON.stringify(msg)))
 
-    return {recv, send, ctl, close}
+    return { recv: p.recv, send, ctl, close }
   }
 #+end_src
 
@@ -600,15 +599,16 @@ clone. Objects cross the boundary without serialization. Works with
 =Worker=, =MessagePort=, =SharedWorker.port=, and =BroadcastChannel=.
 
 #+begin_src js
-  import { port, message } from '../bassline.js'
+  import { port, message, createController } from '../bassline.js'
 
   export function fromPort(messagePort) {
+    const { ctl, close } = createController()
     const p = port()
-    const {recv, ctl, close} = p
     messagePort.onmessage = e => p.send(message(e.data))
     messagePort.onmessageerror = () => close()
+    ctl.closes(p)
     const send = msg => messagePort.postMessage(msg)
-    return { send, recv, ctl, close }
+    return { send, recv: p.recv, ctl, close }
   }
 #+end_src
 
@@ -651,10 +651,10 @@ produce a port of messages.
 #+begin_src js
   export const EOF = Symbol.for('$$BASSLINE_EOF$$')
   function kindOf(v) {
-    if(v === null) return 'null'
-    if(v === undefined) return 'undefined'
-    if(v instanceof Promise) return 'promise'
-    if(Array.isArray(v)) return 'array'
+    if (v === null) return 'null'
+    if (v === undefined) return 'undefined'
+    if (v instanceof Promise) return 'promise'
+    if (Array.isArray(v)) return 'array'
     return typeof v
   }
 
@@ -664,7 +664,7 @@ produce a port of messages.
     nil: v => v == null,
     null: isa('null'),
     undefined: isa('undefined'),
-    defined: v => !(is.undefined(v)),
+    defined: v => !is.undefined(v),
     promise: isa('promise'),
     number: isa('number'),
     string: isa('string'),
@@ -672,11 +672,11 @@ produce a port of messages.
     symbol: isa('symbol'),
     array: isa('array'),
     object: isa('object'),
-    msg: v => is.object(v) && Object.getPrototypeOf(v) === Object.prototype
+    msg: v => is.object(v) && Object.getPrototypeOf(v) === Object.prototype,
   }
 
   export const lazy = fn => {
-    let value, called;
+    let value, called
     return () => {
       if (is.undefined(called))
         value = fn(), called = true
@@ -685,13 +685,13 @@ produce a port of messages.
   }
 
   export function cap(ctl, aFn) {
-    if(!is.fn(aFn)) {
+    if (!is.fn(aFn)) {
       throw new Error('invalid cap, must be a function!')
     }
     let fn = aFn
     ctl.onClose(() => fn = null)
     return function(...args) {
-      if(fn === null) return
+      if (fn === null) return
       return fn(...args)
     }
   }
@@ -701,11 +701,11 @@ produce a port of messages.
     const signal = controller.signal
     const ctl = {
       onClose(fn, aSignal) {
-        if(ctl.closed) return void(fn())
-        signal.addEventListener('abort', fn, {once: true, signal: aSignal})
+        if (ctl.closed) return void fn()
+        signal.addEventListener('abort', fn, { once: true, signal: aSignal })
       },
       closes(...controllers) {
-        for(const c of controllers) {
+        for (const c of controllers) {
           ctl.onClose(() => c.close(), c?.ctl?.signal)
         }
       },
@@ -716,10 +716,10 @@ produce a port of messages.
       signal,
     }
     function close(reason = 'closed') {
-      if(ctl.closed) return
+      if (ctl.closed) return
       controller.abort(reason)
     }
-    return {close, ctl}
+    return { close, ctl }
   }
 
   export const delay = (ms = 1000) => new Promise(res => setTimeout(res, ms))
