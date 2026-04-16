@@ -1,25 +1,29 @@
 import net from 'node:net'
-import { port } from '../bassline.js'
+import { port, createController } from '../bassline.js'
 import defaultFrame from '../frame/jsonl.js'
 
 export function fromSocket(socket, frame = defaultFrame) {
+  const { close, ctl } = createController()
   const raw = port()
   const msgs = port()
+  frame.read(raw.recv).to(msgs.send)
 
   socket.on('data', chunk => raw.send(chunk.toString()))
-  socket.on('close', () => raw.close())
-  socket.on('error', () => raw.close())
+  socket.on('close', close)
+  socket.on('end', close)
+  socket.on('error', close)
 
-  frame.read(raw.recv, msgs.send)
+  ctl.onClose(() => {
+    raw.close()
+    msgs.close()
+    socket.destroy()
+  })
 
   return {
     recv: msgs.recv,
-    send: msg => socket.write(frame.format(msg)),
-    close: () => {
-      msgs.close()
-      raw.close()
-      socket.destroy()
-    },
+    send: msg => void socket.write(frame.format(msg)),
+    ctl,
+    close,
   }
 }
 

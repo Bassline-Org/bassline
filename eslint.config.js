@@ -25,6 +25,7 @@ const sharedGlobals = {
   self: 'readonly',
   Worker: 'readonly',
   crypto: 'readonly',
+  AbortController: 'readonly',
 }
 
 // Shared rules for source files
@@ -34,7 +35,10 @@ const sourceRules = {
   'no-var': 'error', // Modern JS
   'prefer-const': 'warn', // Signal immutability
   'no-shadow': 'off', // Prevent confusion
-  'no-unused-vars': ['error', { varsIgnorePattern: '^_', argsIgnorePattern: '^_' }],
+  'no-unused-vars': [
+    'error',
+    { varsIgnorePattern: '^_', argsIgnorePattern: '^_' },
+  ],
 
   // === Async patterns (critical for resource model) ===
   'no-async-promise-executor': 'error', // Antipattern

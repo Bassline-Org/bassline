@@ -1,21 +1,20 @@
 import nodeNet from 'node:net'
 import { fromSocket } from '../transports/socket.js'
 import { port } from '../bassline.js'
+import defaultFrame from '../frame/jsonl.js'
 
-export function serve(options = {}, frame) {
+export function serve(options = {}, frame = defaultFrame) {
   const p = port()
+  const { recv, close, ctl } = p
   const server = nodeNet.createServer(socket => {
-    p.send(fromSocket(socket, frame))
+    const clientPort = fromSocket(socket, frame)
+    ctl.closes(clientPort)
+    p.send(clientPort)
   })
+
+  ctl.closes(server)
   server.listen(options)
-  server.on('close', () => p.close())
-  server.on('error', () => p.close())
-  return {
-    recv: p.recv,
-    close: () => {
-      p.close()
-      server.close()
-    },
-    server,
-  }
+  server.on('close', close)
+  server.on('error', close)
+  return { connections: recv, recv, server, close, ctl }
 }

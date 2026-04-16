@@ -12,19 +12,25 @@ it.prop([fc.anything()])('message always returns a plain object', input => {
   expect(Object.getPrototypeOf(msg)).toBe(Object.prototype)
 })
 
-it.prop([plainObject])('message of plain object is a copy, not same reference', obj => {
-  const msg = message(obj)
-  expect(msg).toEqual(obj)
-  expect(msg).not.toBe(obj)
-})
-
-it.prop([plainObject, fc.integer({ min: 5, max: 20 })])('message is idempotent', (obj, n) => {
-  let res = message(obj)
-  for (let i = 0; i < n; i++) {
-    res = message(res)
+it.prop([plainObject])(
+  'message of plain object is a copy, not same reference',
+  obj => {
+    const msg = message(obj)
+    expect(msg).toEqual(obj)
+    expect(msg).not.toBe(obj)
   }
-  expect(res).toEqual(obj)
-})
+)
+
+it.prop([plainObject, fc.integer({ min: 5, max: 20 })])(
+  'message is idempotent',
+  (obj, n) => {
+    let res = message(obj)
+    for (let i = 0; i < n; i++) {
+      res = message(res)
+    }
+    expect(res).toEqual(obj)
+  }
+)
 
 it.prop([fc.array(fc.anything(), { minLength: 0, maxLength: 50 })])(
   'port preserves order for any values',
@@ -50,7 +56,10 @@ it.prop([
   expect(result).toEqual(before)
 })
 
-it.prop([fc.array(fc.anything(), { minLength: 0, maxLength: 20 }), fc.integer({ min: 5, max: 20 })])(
+it.prop([
+  fc.array(fc.anything(), { minLength: 0, maxLength: 20 }),
+  fc.integer({ min: 5, max: 20 }),
+])(
   'close is idempotent — calling it multiple times is safe',
   async (values, n) => {
     const p = port()
@@ -61,16 +70,16 @@ it.prop([fc.array(fc.anything(), { minLength: 0, maxLength: 20 }), fc.integer({ 
   }
 )
 
-it.prop([fc.array(fc.integer(), { minLength: 0, maxLength: 50 }), fc.integer({ min: 1, max: 20 })])(
-  'sliding port keeps exactly the last size values',
-  async (values, size) => {
-    const p = port(size)
-    values.forEach(v => p.send(v))
-    p.close()
-    const result = await collect(p.recv)
-    expect(result).toEqual(values.slice(-size))
-  }
-)
+it.prop([
+  fc.array(fc.integer(), { minLength: 0, maxLength: 50 }),
+  fc.integer({ min: 1, max: 20 }),
+])('sliding port keeps exactly the last size values', async (values, size) => {
+  const p = port(size)
+  values.forEach(v => p.send(v))
+  p.close()
+  const result = await collect(p.recv)
+  expect(result).toEqual(values.slice(-size))
+})
 
 test('sliding port with no values returns empty', async () => {
   const p = port(3)
@@ -80,7 +89,10 @@ test('sliding port with no values returns empty', async () => {
 
 // --- sliding port with size >= input keeps everything ---
 
-it.prop([fc.array(fc.integer(), { minLength: 0, maxLength: 20 }), fc.integer({ min: 1, max: 50 })])(
+it.prop([
+  fc.array(fc.integer(), { minLength: 0, maxLength: 20 }),
+  fc.integer({ min: 1, max: 50 }),
+])(
   'sliding port with size > input length keeps all values',
   async (values, extra) => {
     const size = values.length + extra
@@ -103,15 +115,13 @@ test('closing immediately yields empty collection', async () => {
 it.prop([fc.array(fc.anything(), { minLength: 1, maxLength: 20 })])(
   'net: every participant receives what others send',
   async values => {
-    const join = net()
+    const { join, close } = net()
     const sender = join()
     const a = join()
     const b = join()
 
     values.forEach(v => sender.send(v))
-    sender.close()
-    a.close()
-    b.close()
+    close()
 
     const ra = await collect(a.recv)
     const rb = await collect(b.recv)
@@ -123,13 +133,12 @@ it.prop([fc.array(fc.anything(), { minLength: 1, maxLength: 20 })])(
 it.prop([fc.array(fc.anything(), { minLength: 1, maxLength: 20 })])(
   'net: sender never receives own messages',
   async values => {
-    const join = net()
+    const { join, close } = net()
     const a = join()
     const b = join()
 
     values.forEach(v => a.send(v))
-    a.close()
-    b.close()
+    close()
 
     // a only sees what b sent (nothing)
     expect(await collect(a.recv)).toEqual([])
@@ -141,14 +150,13 @@ it.prop([
   fc.array(fc.anything(), { minLength: 0, maxLength: 10 }),
   fc.array(fc.anything(), { minLength: 0, maxLength: 10 }),
 ])('net: join.send broadcasts to all participants', async (before, after) => {
-  const join = net()
+  const { join, send, close } = net()
   const a = join()
   const b = join()
 
-  before.forEach(v => join.send(v))
-  after.forEach(v => join.send(v))
-  a.close()
-  b.close()
+  before.forEach(v => send(v))
+  after.forEach(v => send(v))
+  close()
 
   const all = [...before, ...after]
   expect(await collect(a.recv)).toEqual(all)
@@ -160,12 +168,12 @@ it.prop([
 it.prop([fc.array(fc.anything(), { minLength: 1, maxLength: 20 })])(
   'net: join.close produces EOF on all participants',
   async values => {
-    const join = net()
+    const { join, close } = net()
     const a = join()
     const b = join()
 
     values.forEach(v => a.send(v))
-    join.close()
+    close()
 
     expect(await collect(a.recv)).toEqual([])
     expect(await collect(b.recv)).toEqual(values)
@@ -175,20 +183,23 @@ it.prop([fc.array(fc.anything(), { minLength: 1, maxLength: 20 })])(
 it.prop([
   fc.array(fc.anything(), { minLength: 0, maxLength: 10 }),
   fc.array(fc.anything(), { minLength: 0, maxLength: 10 }),
-])('net: sends after participant close are not routed to it', async (before, after) => {
-  const join = net()
-  const a = join()
-  const b = join()
-  const c = join()
+])(
+  'net: sends after participant close are not routed to it',
+  async (before, after) => {
+    const { join } = net()
+    const a = join()
+    const b = join()
+    const c = join()
 
-  before.forEach(v => a.send(v))
-  b.close()
-  after.forEach(v => a.send(v))
-  c.close()
+    before.forEach(v => a.send(v))
+    b.close()
+    after.forEach(v => a.send(v))
+    c.close()
 
-  // b only got messages before its close
-  expect(await collect(b.recv)).toEqual(before)
-  // c got everything
-  expect(await collect(c.recv)).toEqual([...before, ...after])
-  a.close()
-})
+    // b only got messages before its close
+    expect(await collect(b.recv)).toEqual(before)
+    // c got everything
+    expect(await collect(c.recv)).toEqual([...before, ...after])
+    a.close()
+  }
+)

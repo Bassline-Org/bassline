@@ -1,7 +1,8 @@
 packages:
   #- apps/visual
-  - apps/diagram
-  - apps/brain
+  #- apps/diagram
+  #- apps/brain
+  - apps/daemon
   - packages/brain
   - packages/core
   - packages/ontology

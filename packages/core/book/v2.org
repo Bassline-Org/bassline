@@ -137,16 +137,15 @@ local consumer we are closed.
       for (const w of waiters) w(EOF)
       waiters.length = 0
     })
-    function send(msg) {
+    const send = ctl.cap(msg => {
       if (is.eof(msg)) throw new Error('Bassline EOF is reserved')
-      if (ctl.closed) return
       // resolve the promise if we have a waiter
       if (waiters.length > 0) return waiters.shift()(msg)
       // drop a message if we are over capabity
       if (buffer.length >= size) buffer.shift()
       // add the message to the buffer if we have capacity
       if (size > 0) buffer.push(msg)
-    }
+    })
     function recv() {
       if (buffer.length > 0) return Promise.resolve(buffer.shift())
       if (ctl.closed) return Promise.resolve(EOF)
@@ -172,11 +171,11 @@ setup your propagators to ignore irrelevant information.
     const targets = lazy(() => new Set())
     const propagate = value => targets().forEach(t => t(value))
     ctl.onClose(() => targets().clear())
-    function send(value) {
-      if(closed) return
-      Promise.resolve(fn(value, propagate))
-    }
+    const send = ctl.cap(val => {
+      Promise.resolve(fn(val, propagate))
+    })
     function to(...dests) {
+      if(ctl.closed) return (() => {})
       dests.forEach(d => targets().add(d))
       return () => dests.forEach(d => targets().delete(d))
     }
@@ -189,16 +188,16 @@ setup your propagators to ignore irrelevant information.
 A propagator with state
 
 #+begin_src js
-export function cell(merge, init) {
-  let current = init
-  const {send, to, close, ctl} = propagator((incoming, propagate) => {
-    merge(current, incoming, value => {
-      current = value
-      propagate(value)
+  export function cell(merge, init) {
+    let current = init
+    const {send, to, close, ctl} = propagator((incoming, propagate) => {
+      merge(current, incoming, value => {
+        current = value
+        propagate(value)
+      })
     })
-  })
-  return { send, to, close, ctl, value: () => current }
-}
+    return { send, to, close, ctl, value: () => current }
+  }
 #+end_src
 
 ***** Consume
@@ -212,9 +211,10 @@ propagator, as well as it's lifecycle.
   export function consume(recv, callback) {
     const {send, to, ctl, close} = propagator(callback)
     const promise = (async () => {
-      while (true) {
-        const msg = await recv()
-        if (is.eof(msg) || ctl.closed) break
+      const closed = new Promise(resolve => ctl.onClose(() => resolve(EOF)))
+      while (!ctl.closed) {
+        const msg = await Promise.race([recv(), closed])
+        if (is.eof(msg)) break
         send(msg)
       }
       close()
@@ -245,52 +245,24 @@ single participant, even if they are totally unaware of each other.
 #+begin_src js
   export function net() {
     const ports = new Set()
-    const {ctl, close} = createController()
+    const nc = createController()
 
-    function join(size) {
-      if(ctl.closed) throw new Error('closed')
+    const join = nc.ctl.cap(size => {
       const fromNet = port(size)
       const {recv, ctl, close} = fromNet
-      const toNet = msg => {
-        if(fromNet.ctl.closed) return
+      const send = ctl.cap(msg => {
         ports.forEach(p => p !== fromNet && p.send(msg))
-      }
+      })
       ports.add(fromNet)
-      fromNet.onClose(() => ports.delete(fromNet))
-      return { recv, ctl, close, send: toNet }
-    }
+      nc.ctl.closes(fromNet)
+      ctl.onClose(() => ports.delete(fromNet))
+      return { recv, ctl, close, send }
+    })
 
-    const send = msg => [...ports].forEach(p => p.send(msg))
+    const send = nc.ctl.cap(msg => ports.forEach(p => p.send(msg)))
 
-    ctl.onClose(() => [...ports].forEach(p => p.close()))
-
-    return { join, send, ctl, close }
+    return { join, send, ctl: nc.ctl, close: nc.close }
   }
-#+end_src
-
-**** Communication without input
-Not all communication take input.
-
-A clock is an example of a one-sided communication participant, it can
-say things, but will never listen.
-
-It can be used with anything that wants a capability to receive
-information, and can be used for local chron jobs, scheduling, and
-similar things.
-
-#+begin_src js :tangle no
-export function clock(ms = 1000, eager = true) {
-  const {send, to, close} = propagator((_, p) => p({ts: Date.now()}))
-  const interval = setInterval(send, ms)
-  if(eager) send({})
-  return {
-    to,
-    close: () => {
-      clearInterval(interval)
-      close()
-    },
-  }
-}
 #+end_src
 
 ** Messages
@@ -501,7 +473,7 @@ the socket.
     const {close, ctl} = createController()
     const raw = port()
     const msgs = port()
-    frame.read(raw.recv).to(msg.send)
+    frame.read(raw.recv).to(msgs.send)
 
     socket.on('data', chunk => raw.send(chunk.toString()))
     socket.on('close', close)
@@ -678,7 +650,7 @@ produce a port of messages.
 #+name: utils-omitted
 #+begin_src js
   export const EOF = Symbol.for('$$BASSLINE_EOF$$')
-  export function kindOf(v) {
+  function kindOf(v) {
     if(v === null) return 'null'
     if(v === undefined) return 'undefined'
     if(v instanceof Promise) return 'promise'
@@ -712,6 +684,18 @@ produce a port of messages.
     }
   }
 
+  export function cap(ctl, aFn) {
+    if(!is.fn(aFn)) {
+      throw new Error('invalid cap, must be a function!')
+    }
+    let fn = aFn
+    ctl.onClose(() => fn = null)
+    return function(...args) {
+      if(fn === null) return
+      return fn(...args)
+    }
+  }
+
   export function createController() {
     const controller = new AbortController()
     const signal = controller.signal
@@ -721,8 +705,11 @@ produce a port of messages.
         signal.addEventListener('abort', fn, {once: true, signal: aSignal})
       },
       closes(...controllers) {
-        ctl.onClose(() => controllers.forEach(c => c.close))
+        for(const c of controllers) {
+          ctl.onClose(() => c.close(), c?.ctl?.signal)
+        }
       },
+      cap: fn => cap(ctl, fn),
       get closed() {
         return signal.aborted
       },

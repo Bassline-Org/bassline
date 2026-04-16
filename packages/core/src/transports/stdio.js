@@ -7,18 +7,16 @@ export function fromStdio(frame = defaultFrame) {
   const msgs = port()
   const rl = readline.createInterface({ input: process.stdin })
 
+  const { ctl, close } = raw
+  const { recv } = msgs
+  const send = msg => process.stdout.write(frame.format(msg))
+
+  ctl.closes(msgs, rl)
+
   rl.on('line', line => raw.send(line + '\n'))
   rl.on('close', () => raw.close())
 
-  frame.read(raw.recv, msgs.send)
+  frame.read(raw.recv).to(msgs.send)
 
-  return {
-    recv: msgs.recv,
-    send: msg => process.stdout.write(frame.format(msg)),
-    close: () => {
-      msgs.close()
-      raw.close()
-      rl.close()
-    },
-  }
+  return { recv, send, ctl, close }
 }

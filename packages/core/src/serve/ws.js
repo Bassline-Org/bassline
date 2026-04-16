@@ -2,16 +2,13 @@ import { fromWebSocket } from '../transports/websocket.js'
 import { port } from '../bassline.js'
 
 export function serve(wss) {
-  const p = port()
-  wss.on('connection', ws => p.send(fromWebSocket(ws)))
-  wss.on('close', () => p.close())
-  wss.on('error', () => p.close())
-  return {
-    recv: p.recv,
-    close: () => {
-      p.close()
-      wss.close()
-    },
-    wss,
-  }
+  const { send, ctl, close, recv } = port()
+  wss.on('connection', ws => {
+    const client = fromWebSocket(ws)
+    ctl.closes(client)
+    send(client)
+  })
+  wss.on('close', close)
+  wss.on('error', close)
+  return { recv, wss, ctl, close }
 }

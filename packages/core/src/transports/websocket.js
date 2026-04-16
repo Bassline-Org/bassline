@@ -2,6 +2,7 @@ import { port, message } from '../bassline.js'
 
 export function fromWebSocket(ws) {
   const p = port()
+  const { recv, ctl, close } = p
   ws.addEventListener('message', e => {
     try {
       p.send(message(JSON.parse(e.data)))
@@ -9,15 +10,10 @@ export function fromWebSocket(ws) {
       console.error('failed to parse: ', e)
     }
   })
-  ws.addEventListener('close', () => p.close())
-  ws.addEventListener('error', () => p.close())
+  ws.addEventListener('close', close)
+  ws.addEventListener('error', close)
+  ctl.closes(ws)
+  const send = msg => void ws.send(JSON.stringify(msg))
 
-  return {
-    recv: p.recv,
-    send: msg => ws.send(JSON.stringify(msg)),
-    close: () => {
-      p.close()
-      ws.close()
-    },
-  }
+  return { recv, send, ctl, close }
 }

@@ -1,5 +1,14 @@
 import { describe, it, expect } from 'vitest'
-import { port, net, EOF, is, propagator, offer, accept, hasCap } from '../src/bassline.js'
+import {
+  port,
+  net,
+  EOF,
+  is,
+  propagator,
+  offer,
+  accept,
+  hasCap,
+} from '../src/bassline.js'
 import { collect, filledPort } from './utils.js'
 import { vi } from 'vitest'
 
@@ -79,7 +88,7 @@ describe('port sliding buffer', () => {
 
 describe('net', () => {
   it('broadcasts to all participants', async () => {
-    const join = net()
+    const { join } = net()
     const a = join()
     const b = join()
     const c = join()
@@ -95,7 +104,7 @@ describe('net', () => {
   })
 
   it('does not receive own messages', async () => {
-    const join = net()
+    const { join } = net()
     const a = join()
     const b = join()
 
@@ -110,7 +119,7 @@ describe('net', () => {
   })
 
   it('close removes from routing and produces EOF', async () => {
-    const join = net()
+    const { join } = net()
     const a = join()
     const b = join()
 
@@ -209,7 +218,11 @@ describe('capabilities', () => {
   const [A, B, C] = [Symbol(), Symbol(), Symbol()]
   const simpleMsg = { x: 1, y: 2 }
 
-  async function pipeline(values, offerSyms = [A, B, C], acceptSyms = offerSyms) {
+  async function pipeline(
+    values,
+    offerSyms = [A, B, C],
+    acceptSyms = offerSyms
+  ) {
     const offerHandlers = {}
     offerSyms.forEach(s => (offerHandlers[s] = vi.fn(() => {})))
     const acceptHandlers = {}
@@ -272,7 +285,11 @@ describe('capabilities', () => {
   })
 
   it('only fires matching symbols from partial overlap', async () => {
-    const { offerHandlers, acceptHandlers } = await pipeline([simpleMsg], [A, B], [A, C])
+    const { offerHandlers, acceptHandlers } = await pipeline(
+      [simpleMsg],
+      [A, B],
+      [A, C]
+    )
     // A: offered and accepted
     expect(offerHandlers[A]).toHaveBeenCalledOnce()
     expect(acceptHandlers[A]).toHaveBeenCalledOnce()

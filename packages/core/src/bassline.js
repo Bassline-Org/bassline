@@ -1,5 +1,5 @@
 export const EOF = Symbol.for('$$BASSLINE_EOF$$')
-export function kindOf(v) {
+function kindOf(v) {
   if (v === null) return 'null'
   if (v === undefined) return 'undefined'
   if (v instanceof Promise) return 'promise'
@@ -32,96 +32,130 @@ export const lazy = fn => {
   }
 }
 
+export function cap(ctl, aFn) {
+  if (!is.fn(aFn)) {
+    throw new Error('invalid cap, must be a function!')
+  }
+  let fn = aFn
+  ctl.onClose(() => (fn = null))
+  return function (...args) {
+    if (fn === null) return
+    return fn(...args)
+  }
+}
+
+export function createController() {
+  const controller = new AbortController()
+  const signal = controller.signal
+  const ctl = {
+    onClose(fn, aSignal) {
+      if (ctl.closed) return void fn()
+      signal.addEventListener('abort', fn, { once: true, signal: aSignal })
+    },
+    closes(...controllers) {
+      for (const c of controllers) {
+        ctl.onClose(() => c.close(), c?.ctl?.signal)
+      }
+    },
+    cap: fn => cap(ctl, fn),
+    get closed() {
+      return signal.aborted
+    },
+    signal,
+  }
+  function close(reason = 'closed') {
+    if (ctl.closed) return
+    controller.abort(reason)
+  }
+  return { close, ctl }
+}
+
 export const delay = (ms = 1000) => new Promise(res => setTimeout(res, ms))
 export function port(size = Infinity) {
   const buffer = [],
     waiters = []
-  let closed = false
-  function close() {
-    closed = true
+  const { close, ctl } = createController()
+  ctl.onClose(() => {
     for (const w of waiters) w(EOF)
     waiters.length = 0
-  }
-  function send(msg) {
+  })
+  const send = ctl.cap(msg => {
     if (is.eof(msg)) throw new Error('Bassline EOF is reserved')
-    if (closed) return
     // resolve the promise if we have a waiter
     if (waiters.length > 0) return waiters.shift()(msg)
     // drop a message if we are over capabity
     if (buffer.length >= size) buffer.shift()
     // add the message to the buffer if we have capacity
     if (size > 0) buffer.push(msg)
-  }
+  })
   function recv() {
     if (buffer.length > 0) return Promise.resolve(buffer.shift())
-    if (closed) return Promise.resolve(EOF)
+    if (ctl.closed) return Promise.resolve(EOF)
     return new Promise(resolve => waiters.push(resolve))
   }
-  return { send, recv, close }
+  return { send, recv, close, ctl }
 }
 
 export function propagator(fn = (v, p) => p(v)) {
-  let closed = false
+  const { close, ctl } = createController()
   const targets = lazy(() => new Set())
   const propagate = value => targets().forEach(t => t(value))
-  function send(value) {
-    if (closed) return
-    Promise.resolve(fn(value, propagate))
-  }
+  ctl.onClose(() => targets().clear())
+  const send = ctl.cap(val => {
+    Promise.resolve(fn(val, propagate))
+  })
   function to(...dests) {
+    if (ctl.closed) return () => {}
     dests.forEach(d => targets().add(d))
     return () => dests.forEach(d => targets().delete(d))
   }
-  function close() {
-    closed = true
-    targets().clear()
-  }
-  return { send, to, close }
+  return { send, to, close, ctl }
 }
 
 export function cell(merge, init) {
   let current = init
-  const { send, to, close } = propagator((incoming, propagate) => {
+  const { send, to, close, ctl } = propagator((incoming, propagate) => {
     merge(current, incoming, value => {
       current = value
       propagate(value)
     })
   })
-  return { send, to, close, value: () => current }
+  return { send, to, close, ctl, value: () => current }
 }
 
 export function consume(recv, callback) {
-  const p = propagator(callback)
+  const { send, to, ctl, close } = propagator(callback)
   const promise = (async () => {
-    while (true) {
-      const msg = await recv()
+    const closed = new Promise(resolve => ctl.onClose(() => resolve(EOF)))
+    while (!ctl.closed) {
+      const msg = await Promise.race([recv(), closed])
       if (is.eof(msg)) break
-      p.send(msg)
+      send(msg)
     }
-    p.close()
+    close()
   })()
-  return { to: p.to, promise }
+  return { to, ctl, close, promise }
 }
 
 export function net() {
   const ports = new Set()
-  function join(size) {
+  const nc = createController()
+
+  const join = nc.ctl.cap(size => {
     const fromNet = port(size)
+    const { recv, ctl, close } = fromNet
+    const send = ctl.cap(msg => {
+      ports.forEach(p => p !== fromNet && p.send(msg))
+    })
     ports.add(fromNet)
-    return {
-      recv: fromNet.recv,
-      send(msg) {
-        ports.forEach(p => p !== fromNet && p.send(msg))
-      },
-      close() {
-        fromNet.close()
-        ports.delete(fromNet)
-      },
-    }
-  }
-  join.close = () => [...ports].forEach(p => p.close())
-  join.send = msg => [...ports].forEach(p => p.send(msg))
-  return join
+    nc.ctl.closes(fromNet)
+    ctl.onClose(() => ports.delete(fromNet))
+    return { recv, ctl, close, send }
+  })
+
+  const send = nc.ctl.cap(msg => ports.forEach(p => p.send(msg)))
+
+  return { join, send, ctl: nc.ctl, close: nc.close }
 }
 
 export function message(content) {

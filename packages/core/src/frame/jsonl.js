@@ -1,8 +1,8 @@
 import { message, consume } from '../bassline.js'
 
-export function readFrame(recv, dest) {
+export function readFrame(recv) {
   let buffer = ''
-  const prop = consume(recv, (chunk, send) => {
+  return consume(recv, (chunk, send) => {
     buffer += chunk
     let nl
     while ((nl = buffer.indexOf('\n')) !== -1) {
@@ -16,8 +16,6 @@ export function readFrame(recv, dest) {
       }
     }
   })
-  prop.to(dest)
-  return prop
 }
 
 export const format = msg => JSON.stringify(msg) + '\n'
