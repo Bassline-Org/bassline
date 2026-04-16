@@ -93,12 +93,15 @@ export function lazy<T>(fn: () => T): () => T
 export interface Ctl {
   closed: boolean
   signal: AbortSignal
-  cap<T>(fn: T): Revocable<T>
+  cap<T extends (...args: unknown[]) => unknown>(fn: T): Revocable<T>
   onClose(fn: () => void, signal?: AbortSignal): void
   closes(...controllers: Array<Ctl & { close: Close }>): void
 }
 export function createController(): { close: Close; ctl: Ctl }
-export function cap<T>(ctl: Ctl, fn: T): Revocable<T>
+export function cap<T extends (...args: unknown[]) => unknown>(
+  ctl: Ctl,
+  fn: T
+): Revocable<T>
 
 // frame stuff
 export function fromWebSocket(ws: unknown): Port<Message>
