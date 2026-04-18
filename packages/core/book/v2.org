@@ -1,5 +1,5 @@
 #+title: Bassline V2
-#+subtitle: Non-local ontology considered harmful
+#+subtitle: Completely Partial Programming
 #+author: Goose
 #+property: header-args:js  :mkdirp yes :noweb yes
 #+property: header-args:js+ :results output
