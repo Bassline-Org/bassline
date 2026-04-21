@@ -79,6 +79,7 @@ export const is: {
   undefined: Shaped<undefined>
   defined: Shaped<Exclude<unknown, undefined>>
   promise: Shaped<Promise<unknown>>
+  boolean: Shaped<boolean>
   number: Shaped<number>
   string: Shaped<string>
   fn: Shaped<Function>

@@ -15,6 +15,7 @@ export const is = {
   undefined: isa('undefined'),
   defined: v => !is.undefined(v),
   promise: isa('promise'),
+  boolean: isa('boolean'),
   number: isa('number'),
   string: isa('string'),
   fn: isa('function'),
