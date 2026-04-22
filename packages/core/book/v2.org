@@ -390,8 +390,6 @@ capabilities as they process and share the messages.
 As above, it helps to separate the abstract role of a transport from
 the concrete transport used in this book.
 
-** TODO This should be cleaned up
-
 ** Abstractly
 
 A transport adapts some external medium into local communication

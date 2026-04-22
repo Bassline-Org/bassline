@@ -94,9 +94,9 @@ export function lazy<T>(fn: () => T): () => T
 export interface Ctl {
   closed: boolean
   signal: AbortSignal
-  fn<T extends (...args: unknown[]) => unknown>(aFn: T): Revocable<T>
+  fn<T>(aFn: T): Revocable<T>
   onClose(fn: () => void, signal?: AbortSignal): void
-  closes(...controllers: Array<Ctl & { close: Close }>): void
+  closes(...controllers: Array<{ close: Close }>): void
 }
 export function createController(): { close: Close; ctl: Ctl }
 
@@ -110,10 +110,9 @@ export function format(msg: unknown): string
 
 // General Helper Types
 export type Message<T = unknown> = Record<string, unknown> & T
-export type Void = void | Promise<void>
-export type Send<T = Message> = (msg: T) => Void
+export type Send<T = Message> = (msg: T) => void
 export type Recv<T = Message> = () => Promise<T | typeof EOF>
-export type Close = (reason?: string) => Void
+export type Close = (reason?: string) => void
 export type Revocable<T> = T extends (...args: infer A) => infer R
   ? (...args: A) => R | undefined
   : never
