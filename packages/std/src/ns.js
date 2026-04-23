@@ -2,8 +2,8 @@ import { port, consume, createController } from '@bassline/core'
 import { send as sendCap, close as closeCap, enrich } from './caps.js'
 
 /**
- * Builds a namespace & router primitive for bassline systems
- * @import {Send, Ctl, Close, Port, Propagator, Revocable, Consume, Message, PropagateFn} from "@bassline/core"
+ * Builds a namespace & router tool for bassline systems
+ * @import {Send, Ctl, Close, Port, Revocable, Consume, Message} from "@bassline/core"
  * @typedef {ReturnType<typeof leaf>} Leaf
  * @typedef {{port: Port, propagator: Consume<Message>}} NsEntry
  * @typedef {ReturnType<typeof namespace>} Namespace
@@ -102,6 +102,8 @@ export function router(ns) {
       node?.port.send(msg)
     }
   })
+  const { ctl, close, send } = l
+  const sendTo = (dest, msg) => send({ ...msg, $dest: dest })
   ns.ctl.closes(l)
-  return l
+  return { ctl, close, send, sendTo }
 }
