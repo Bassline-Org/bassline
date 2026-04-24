@@ -10,13 +10,13 @@ export function kindOf(v) {
 const isa = kind => v => kindOf(v) === kind
 export const is = {
   eof: v => v === EOF,
-  nil: v => v == null,
+  nil: v => v == null || Number.isNaN(v),
   null: isa('null'),
   undefined: isa('undefined'),
   defined: v => !is.undefined(v),
   promise: isa('promise'),
   boolean: isa('boolean'),
-  number: isa('number'),
+  number: v => isa('number')(v) && !Number.isNaN(v),
   string: isa('string'),
   fn: isa('function'),
   symbol: isa('symbol'),
