@@ -2,9 +2,12 @@ import { createController, is } from '@bassline/core'
 import { isCapable, isVia } from './data.js'
 import { enrich, createCap } from './caps.js'
 import { entries, symbolEntries } from './shape.js'
+import { leaf } from './ns.js'
 /**
  * @import { Send, Ctl, Close } from "@bassline/core"
  */
+
+export const sendVia = (send, id) => msg => send({ ...msg, via: id })
 
 /**
  * @param {{send: Send, ctl: Ctl}} outgoing
@@ -37,22 +40,17 @@ export function cacheCaps(outgoing) {
       // we store the caps by cap id, not by name
       if (byId.has(id)) {
         const entry = byId.get(id)
-        enrichments.push([entry.cap, entry.fn])
+        enrichments.push([entry.cap, entry.send])
         continue
       }
-      const capControl = createController()
-      const entry = {
-        cap: getCap(name),
-        fn: capControl.ctl.fn(m => outgoing.send({ ...m, via: id })),
-        ctl: capControl.ctl,
-        close: capControl.close,
-      }
+      const entry = { cap: getCap(name), ...leaf(sendVia(outgoing.send, id)) }
       ctl.closes(entry)
       entry.ctl.onClose(() => byId.delete(id))
-      enrichments.push([entry.cap, entry.fn])
+      enrichments.push([entry.cap, entry.send])
     }
     return enrich(m, enrichments)
   })
+
   return { ctl, close, bind, revoke }
 }
 
@@ -64,21 +62,19 @@ export function routeCaps() {
   /**
    *
    * @param {Send} send
+   * @param {string} [id]
    * @returns {{id: string, ctl: Ctl, close: Close, send: Send}}
    */
-  function park(send) {
+  function park(send, id = crypto.randomUUID()) {
     if (bySend.has(send)) return bySend.get(send)
-    const c = createController()
-    const id = crypto.randomUUID()
-    const entry = { id, send, ctl: c.ctl, close: c.close }
+    const entry = { ...leaf(send), id }
     bySend.set(send, entry)
     byId.set(id, entry)
-    const cleanup = () => {
+    entry.ctl.onClose(() => {
       bySend.delete(send)
       byId.delete(id)
-    }
-    c.ctl.onClose(cleanup)
-    ctl.onClose(cleanup)
+    })
+    ctl.closes(entry)
     return entry
   }
 

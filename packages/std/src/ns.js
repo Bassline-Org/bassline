@@ -74,15 +74,17 @@ export function namespace(defaultSize) {
   }
   const keys = ctl.fn(() => ports.keys())
   const entries = ctl.fn(() => ports.entries())
+  const has = key => ports.has(key)
 
   return {
     close,
     ctl,
     common,
-    at: ctl.fn(at),
     keys,
     entries,
     relay: ctl.fn(relay),
+    has: ctl.fn(has),
+    at: ctl.fn(at),
   }
 }
 
@@ -93,17 +95,13 @@ export function namespace(defaultSize) {
  */
 export function router(ns) {
   const l = leaf(m => {
-    const { $dest, ...msg } = m
-    if (typeof $dest === 'string') {
-      if ($dest !== 'messages') {
-        ns.common.messages.port.send(m)
-      }
-      const node = ns.at($dest)
-      node?.port.send(msg)
-    }
+    const { via, ...msg } = m
+    if (typeof via !== 'string') return
+    if (via !== 'messages') ns.common.messages.port.send(m)
+    ns.at(via).port.send(msg)
   })
   const { ctl, close, send } = l
-  const sendTo = (dest, msg) => send({ ...msg, $dest: dest })
+  const sendTo = (via, msg) => send({ ...msg, via })
   ns.ctl.closes(l)
   return { ctl, close, send, sendTo }
 }
