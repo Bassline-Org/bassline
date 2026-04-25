@@ -1,5 +1,5 @@
 /**
- * A set of useful reified data types as messages for Bassline
+ * A set of useful data types reified as messages for Bassline
  * The data types chosen are inspired by rebol, but slightly modified
  *
  * Additionally these data types are structural, and designed to be layered
@@ -15,6 +15,7 @@
  * - intervals
  * - semver
  * - uri
+ * - capabilities
  * @todo the uri is technically just an href for now, but this will support both reprs later
  */
 import { is } from '@bassline/core'
@@ -22,9 +23,20 @@ import {
   AssertionFailure,
   assert,
   tryAssert,
+  ensure,
   conforms,
   isScalarType,
 } from './shape.js'
+
+// ==== scalar ====
+export const isScalar = conforms({ scalar: isScalarType })
+export function scalar(value) {
+  const fmt = val => ({ scalar: val })
+
+  if (isScalar(value)) return value
+  if (isScalarType(value)) return fmt(value)
+  throw new AssertionFailure(`Invalid scalar: ${JSON.stringify(value)}`)
+}
 
 // ==== collection ====
 export const isCollection = conforms({ items: is.array })
@@ -40,16 +52,6 @@ export function collection(value) {
     return fmt(Array.from(value))
   }
   throw new AssertionFailure('invalid collection type')
-}
-
-// ==== scalar ====
-export const isScalar = conforms({ scalar: isScalarType })
-export function scalar(value) {
-  const fmt = val => ({ scalar: val })
-
-  if (isScalar(value)) return value
-  if (isScalarType(value)) return fmt(value)
-  throw new AssertionFailure(`Invalid scalar: ${JSON.stringify(value)}`)
 }
 
 // ==== interval ====
@@ -88,3 +90,14 @@ export function uri(href) {
   assertUri(m)
   return m
 }
+
+// ==== capability ====
+export const isCapable = conforms({
+  capabilities: ensure([is.object, v => Object.values(v).every(is.string)]),
+})
+
+export const isVia = conforms({ via: is.string })
+export const isSourced = conforms({
+  source: is.string,
+})
+export const withSource = source => msg => ({ ...msg, source })
