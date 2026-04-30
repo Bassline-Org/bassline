@@ -2,7 +2,7 @@ import { consume } from '@bassline/core'
 import { serve } from '@bassline/core/serve/tcp'
 import { session } from '../src/cache.js'
 import { cancel, reply } from '../src/caps.js'
-import { scalar } from '../src/data.js'
+import { scalar } from '../src/data/index.js'
 
 const host = process.env.BASSLINE_CAP_HOST ?? '127.0.0.1'
 const port = Number(process.env.BASSLINE_CAP_PORT ?? 7878)

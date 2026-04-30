@@ -2,12 +2,32 @@
 import { hasCap } from '@bassline/core'
 
 /**
+ * @param {Message} msg
+ * @param {Array<[Cap, Send]>} handlers
+ */
+export function enrich(msg, handlers) {
+  let m = msg
+  for (const [cap, fn] of handlers) {
+    m = cap.grant(m, fn)
+  }
+  return m
+}
+
+/**
 @import { Message, Send } from '@bassline/core'
 @typedef {ReturnType<typeof createCap>} Cap
 @param {string} spelling
  */
 export function createCap(spelling) {
   const symbol = Symbol.for(spelling)
+
+  /**
+   * @param {Message} msg
+   * @returns {boolean}
+   */
+  function check(msg) {
+    return hasCap(msg, symbol)
+  }
 
   /**
    * @param {Message} msg
@@ -33,7 +53,7 @@ export function createCap(spelling) {
     }
   }
 
-  return { symbol, grant, invoke }
+  return { symbol, grant, invoke, check }
 }
 
 /**
@@ -51,39 +71,21 @@ export const reply = createCap('bassline/reply/1')
 export const reject = createCap('bassline/reject/1')
 
 /**
- * Cap for request/response rejection on a message
- * Logically similar to Promise.reject
- * @see {@link reply}
+ * Cap for explicit cancellation, similar to reject
  */
 export const cancel = createCap('bassline/cancel/1')
 
+/**
+ * Cap to close a controller
+ */
 export const close = createCap('bassline/close/1')
+
+/**
+ * Cap for an arbtirary send
+ */
 export const send = createCap('bassline/send/1')
 
 /**
- * @param {Message} msg
- * @param {Array<[Cap, Send]>} handlers
+ * Cap for keep-alive style messages
  */
-export function enrich(msg, handlers) {
-  let m = msg
-  for (const [cap, fn] of handlers) {
-    m = cap.grant(m, fn)
-  }
-  return m
-}
-
-/**
- * Invokes a send, with caps reply and reject bound to the resolve & reject of a promise
- * @param {{send: Send}} target
- * @param {Message} msg
- * @returns {Promise<unknown>}
- */
-export const call = (target, msg) =>
-  new Promise((res, rej) => {
-    target.send(
-      enrich(msg, [
-        [reply, res],
-        [reject, rej],
-      ])
-    )
-  })
+export const ping = createCap('bassline/ping/1')

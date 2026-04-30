@@ -4,18 +4,12 @@
   "description": "Standard Library for Bassline",
   "type": "module",
   "exports": {
-    "./caps": {
-      "types": "./src/caps.d.ts",
-      "default": "./src/caps.js"
-    },
-    "./cells": {
-      "types": "./src/cells.d.ts",
-      "default": "./src/cells.js"
-    },
-    "./propagators": {
-      "types": "./src/propagators/index.d.ts",
-      "default": "./src/propagators/index.js"
-    }
+    "./data": "./src/data/index.js",
+    "./roles": "./src/role/index.js",
+    "./shape": "./src/shape.js",
+    "./caps": "./src/caps.js",
+    "./ns": "./src/ns.js",
+    "./cache": "./src/cache.js"
   },
   "scripts": {
     "test": "vitest run"

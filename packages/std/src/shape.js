@@ -1,5 +1,6 @@
 import { is } from '@bassline/core'
 
+export const merge = msgs => msgs.reduce((acc, curr) => ({ ...acc, ...curr }))
 export const and = (a, b) => value => a(value) && b(value)
 export const or = (a, b) => value => a(value) || b(value)
 
@@ -13,24 +14,30 @@ export const symbolEntries = o =>
   Object.getOwnPropertySymbols(o).map(sym => [sym, o[sym]])
 
 export class AssertionFailure extends Error {}
-export const assert = preds => value => {
-  for (const [pred, msg = 'assertion failed'] of preds) {
-    if (!pred(value)) {
-      throw new AssertionFailure(
-        `message: ${msg}: value: ${JSON.stringify(value)}`
-      )
+export function failure(msg) {
+  return new AssertionFailure(msg)
+}
+
+export function invariants(preds) {
+  function assert(value) {
+    for (const [pred, msg = _v => 'assertion failed'] of preds) {
+      if (!pred(value)) {
+        if (is.fn(msg)) throw failure(msg(value))
+        throw failure(msg)
+      }
+    }
+    return value
+  }
+  assert.test = value => {
+    try {
+      assert(value)
+      return true
+    } catch (e) {
+      if (e instanceof AssertionFailure) return false
+      throw e
     }
   }
-  return value
-}
-export const tryAssert = assertion => value => {
-  try {
-    assertion(value)
-    return true
-  } catch (e) {
-    if (e instanceof AssertionFailure) return false
-    throw e
-  }
+  return assert
 }
 
 export const ensure = preds => value => preds.every(f => f(value))

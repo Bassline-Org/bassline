@@ -1,10 +1,10 @@
 import { createController, is } from '@bassline/core'
 import { leaf } from './ns.js'
-import { assert, symbolEntries } from './shape.js'
+import { invariants, symbolEntries } from './shape.js'
 import { createCap } from './caps.js'
-import { isVia, isCapable } from './data.js'
+import { isVia, isCapable } from './data/index.js'
 
-const assertValidSend = assert([[is.fn, 'send must be a function']])
+const assertValidSend = invariants([[is.fn, 'send must be a function']])
 
 export function capCache({ createId = () => crypto.randomUUID() } = {}) {
   const { ctl, close } = createController()
@@ -19,7 +19,7 @@ export function capCache({ createId = () => crypto.randomUUID() } = {}) {
     if (entry) entry.close()
   }
 
-  const assertValidId = assert([
+  const assertValidId = invariants([
     [is.string, 'id must be a string'],
     [id => !has(id), 'id already parked'],
   ])

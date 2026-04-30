@@ -2,27 +2,12 @@ import { port, consume, createController } from '@bassline/core'
 import { send as sendCap, close as closeCap, enrich } from './caps.js'
 
 /**
- * Builds a namespace & router tool for bassline systems
+ * Implements a namespace & router construct for bassline systems
  * @import {Send, Ctl, Close, Port, Revocable, Consume, Message} from "@bassline/core"
  * @typedef {ReturnType<typeof leaf>} Leaf
  * @typedef {{port: Port, propagator: Consume<Message>}} NsEntry
  * @typedef {ReturnType<typeof namespace>} Namespace
  */
-
-/**
- *
- * a leaf participant
- * @param {Send} fn
- * @returns {{send: Send, ctl: Ctl, close: Close}}
- */
-export const leaf = fn => {
-  const { ctl, close } = createController()
-  /**
-   * @type {Revocable<Send>}
-   */
-  const send = ctl.fn(msg => void fn(msg))
-  return { ctl, close, send }
-}
 
 /**
  * @param {number} [defaultSize]
@@ -95,13 +80,28 @@ export function namespace(defaultSize) {
  */
 export function router(ns) {
   const l = leaf(m => {
-    const { via, ...msg } = m
-    if (typeof via !== 'string') return
-    if (via !== 'messages') ns.common.messages.port.send(m)
-    ns.at(via).port.send(msg)
+    const { dest, ...msg } = m
+    if (typeof dest !== 'string') return
+    if (dest !== 'messages') ns.common.messages.port.send(m)
+    ns.at(dest).port.send(msg)
   })
   const { ctl, close, send } = l
-  const sendTo = (via, msg) => send({ ...msg, via })
+  const sendTo = (dest, msg = {}) => send({ ...msg, dest })
   ns.ctl.closes(l)
   return { ctl, close, send, sendTo }
+}
+
+/**
+ *
+ * a leaf participant
+ * @param {Send} fn
+ * @returns {{send: Send, ctl: Ctl, close: Close}}
+ */
+export const leaf = fn => {
+  const { ctl, close } = createController()
+  /**
+   * @type {Revocable<Send>}
+   */
+  const send = ctl.fn(msg => void fn(msg))
+  return { ctl, close, send }
 }
