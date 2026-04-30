@@ -89,3 +89,13 @@ export const send = createCap('bassline/send/1')
  * Cap for keep-alive style messages
  */
 export const ping = createCap('bassline/ping/1')
+
+/**
+ * Cap to pass a port like message through
+ */
+export const connect = createCap('bassline/connect/1')
+
+/**
+ * Cap to pass a request shaped message through
+ */
+export const request = createCap('bassline/request/1')

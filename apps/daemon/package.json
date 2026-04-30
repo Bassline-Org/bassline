@@ -3,11 +3,12 @@
   "version": "0.0.1",
   "scripts": {
     "test": "vitest run",
-    "start": "node daemon.js"
+    "start": "node src/server.js /tmp/bassline.sock",
+    "connect": "node src/client.js /tmp/bassline.sock"
   },
   "type": "module",
   "dependencies": {
     "@bassline/core": "workspace:*",
-    "cytoscape": "^3.33.2"
+    "@bassline/std": "workspace:*"
   }
 }

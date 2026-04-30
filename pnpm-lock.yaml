@@ -70,9 +70,9 @@ importers:
       '@bassline/core':
         specifier: workspace:*
         version: link:../../packages/core
-      cytoscape:
-        specifier: ^3.33.2
-        version: 3.33.2
+      '@bassline/std':
+        specifier: workspace:*
+        version: link:../../packages/std
 
   packages/brain:
     dependencies:

@@ -5,7 +5,7 @@
   "type": "module",
   "exports": {
     "./data": "./src/data/index.js",
-    "./roles": "./src/role/index.js",
+    "./roles": "./src/roles/index.js",
     "./shape": "./src/shape.js",
     "./caps": "./src/caps.js",
     "./ns": "./src/ns.js",

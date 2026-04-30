@@ -24,6 +24,7 @@ export class Role {
       if (!cap.check(msg)) return null
     }
     const inst = Object.create(this.prototype)
+    inst.msg = msg
     inst.init(msg)
     return inst
   }

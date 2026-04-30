@@ -28,13 +28,22 @@ export class Request extends Role {
   }
 }
 
-export function request(msg) {
-  let resolverMsg
+export function requester({ send }) {
+  return async aMessage => {
+    const { promise, msg } = createRequest(aMessage)
+    send(msg)
+    const result = await promise
+    return result
+  }
+}
+
+export function createRequest(aMsg) {
+  let msg
   const promise = new Promise((res, rej) => {
-    resolverMsg = enrich(msg, [
+    msg = enrich(aMsg, [
       [reply, res],
       [reject, rej],
     ])
   })
-  return { promise, msg: resolverMsg }
+  return { promise, msg }
 }
