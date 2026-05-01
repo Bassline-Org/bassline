@@ -4,7 +4,8 @@
   "scripts": {
     "test": "vitest run",
     "start": "node src/server.js /tmp/bassline.sock",
-    "connect": "node src/client.js /tmp/bassline.sock"
+    "connect": "node src/client.js /tmp/bassline.sock",
+    "publish": "node src/publisher.js /tmp/bassline.sock"
   },
   "type": "module",
   "dependencies": {

@@ -7,7 +7,7 @@
 /**
  * @template {typeof Role} T
  * @param {T} aRole
- * @param {Send<T>} fn
+ * @param {Send<InstanceType<T>>} fn
  * @returns {Send<Message>}
  */
 export function matches(aRole, fn) {

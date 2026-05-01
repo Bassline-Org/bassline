@@ -1,3 +1,6 @@
+/**
+ * @import { Send, Close, Message } from "@bassline/core"
+ */
 import { is } from '@bassline/core'
 import { Role } from './role.js'
 import { send, close, enrich } from '../caps.js'
@@ -18,7 +21,12 @@ export const assertPortShaped = invariants([
   [conforms({ send: is.fn, close: is.fn }), 'not port shaped'],
 ])
 
-export function portLike(msg, port) {
+/**
+ *
+ * @param {Message} msg
+ * @param {{send: Send, close: Close}} port
+ */
+export function advertise(msg, port) {
   assertPortShaped(port)
   return enrich(msg, [
     [send, port.send],

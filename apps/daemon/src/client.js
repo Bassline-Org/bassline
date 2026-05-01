@@ -1,36 +1,51 @@
-import { consume } from '@bassline/core'
+#!/usr/bin/env node
 import { connect } from '@bassline/core/transports/socket'
-import { PortLike, requester, matches } from '@bassline/std/roles'
-import { session } from '@bassline/std/cache'
+import { sessionConnect } from '@bassline/std/cache'
+import { send as sendCap, reply, reject, enrich } from '@bassline/std/caps'
+import { PortLike, Request, Ping, matches } from '@bassline/std/roles'
 
-const [_, __, socket = '/tmp/bassline.sock'] = process.argv
+const [, , socketPath = '/tmp/bassline.sock'] = process.argv
 
-const client = connect({ path: socket })
+const conn = connect({ path: socketPath })
 
-const sesh = session(client.send)
+let subscribed = false
 
-console.log('connected to: ', socket)
-
-const onPort = matches(PortLike, async match => {
-  const ask = requester({ send: msg => match.send(msg) })
-  let res = await ask({ hello: 'world' })
-  console.log('res:', res)
-  res = await ask({ msg: 'hello-again' })
-  console.log('res:', res)
-  match.close()
+const onDaemon = matches(PortLike, daemon => {
+  if (subscribed) return
+  subscribed = true
+  const subReq = enrich({ cmd: 'subscribe' }, [
+    [reply, ack => console.log('subscribed:', ack.description)],
+    [reject, err => console.log('rejected:', err)],
+    [sendCap, describe],
+  ])
+  daemon.send(subReq)
+  console.log('subscribe request sent')
 })
 
-consume(client.recv, msg => {
-  console.log('received: ', msg)
-  const m = sesh.dispatch(msg)
-  if (!m) return
-  onPort(m)
-})
+sessionConnect(conn, onDaemon)
 
-process.on('SIGINT', client.close)
-process.on('SIGTERM', client.close)
-client.ctl.onClose(() => {
-  console.log('disconnecting')
-})
+function describe(item) {
+  if (item.removed) {
+    console.log(`removed: ${item.id}`)
+    return
+  }
+  const tags = []
+  const portLikeInst = PortLike.match(item)
+  if (portLikeInst) tags.push('PortLike')
+  if (Request.match(item)) tags.push('Request')
+  if (Ping.match(item)) tags.push('Ping')
+  console.log(
+    `${item.id}: ${item.description ?? '(no description)'} [${
+      tags.join(', ') || 'no recognized roles'
+    }]`
+  )
+  if (portLikeInst) {
+    portLikeInst.send({ probe: 'hello from reader' })
+  }
+}
 
-console.log(client)
+const stop = () => conn.close()
+process.on('SIGINT', stop)
+process.on('SIGTERM', stop)
+
+console.log(`reader connected to ${socketPath}`)

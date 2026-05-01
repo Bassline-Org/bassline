@@ -1,42 +1,96 @@
 #!/usr/bin/env node
-import { consume } from '@bassline/core'
+import { propagator, cell, consume } from '@bassline/core'
 import { serve } from '@bassline/core/serve/tcp'
 import { session } from '@bassline/std/cache'
-import * as caps from '@bassline/std/caps'
-import introduce from './systems/index.js'
+import { conforms, invariants } from '@bassline/std/shape'
+import {
+  send as sendCap,
+  reply,
+  reject,
+  close as closeCap,
+  ping,
+  cancel,
+  enrich,
+} from '@bassline/std/caps'
 
-const [_, __, socket = '/tmp/bassline.sock'] = process.argv
+const [, , socketPath = '/tmp/bassline.sock'] = process.argv
 
-const { connections, close } = serve({ path: socket })
+const { connections, close: stopServer } = serve({ path: socketPath })
 
-const sessions = new Set()
+const feed = propagator()
+
+const known = cell((state, inc, update) => {
+  const { removed, id } = inc
+  if (removed) {
+    if (!state.has(id)) return
+    state.delete(id)
+    update(state)
+  } else {
+    if (state.has(id)) return
+    state.set(inc.id, inc)
+    update(state)
+  }
+}, new Map())
+
+feed.to(known.send)
+
+let counter = 0
+const newId = () => `i${++counter}`
+
+const hasAnyCap = msg =>
+  [sendCap, reply, reject, closeCap, ping, cancel].some(c => c.check(msg))
 
 consume(connections, conn => {
-  console.log('new client')
-
   const sesh = session(conn.send)
-
-  sessions.add(sesh)
-
-  sesh.ctl.onClose(() => {
-    sessions.delete(sesh)
-    console.log('client left. sessions: ', sessions)
-  })
-
   conn.ctl.closes(sesh)
+  sesh.ctl.onClose(() => console.log('client left'))
 
-  introduce(sesh)
+  const subscribeCmd = invariants([
+    [conforms({ cmd: 'subscribe' }), 'not command shaped'],
+    [reply.check, 'missing reply cap'],
+    [sendCap.check, 'missing send cap'],
+  ])
+
+  function archive(msg) {
+    const id = newId()
+    feed.send({ id, ...msg })
+    sesh.ctl.onClose(() => feed.send({ id, removed: true }))
+  }
+
+  function subscribe(msg) {
+    const deliver = item => sendCap.invoke(msg, item)
+    const cleanup = feed.to(deliver)
+    sesh.ctl.onClose(cleanup)
+    for (const [_id, intro] of known.value()) deliver(intro)
+    reply.invoke(msg, { description: 'subscribed' })
+  }
+
+  function handleIncoming(msg) {
+    if (subscribeCmd.test(msg)) return subscribe(msg)
+    if (hasAnyCap(msg)) return archive(msg)
+    console.log('unhandled:', msg)
+  }
+
+  sesh.send(
+    enrich({ description: 'bassline daemon — contribute or subscribe' }, [
+      [sendCap, handleIncoming],
+      [closeCap, () => conn.close()],
+    ])
+  )
 
   consume(conn.recv, msg => {
     const m = sesh.dispatch(msg)
-    if (m) {
-      console.log('unhandled message: ', m)
-      sesh.send({ unhandled: m })
-    }
+    if (m) console.log('unhandled raw:', m)
   })
+
+  console.log('peer connected')
 })
 
-process.on('SIGINT', close)
-process.on('SIGTERM', close)
+const stop = () => {
+  stopServer()
+  feed.close()
+}
+process.on('SIGINT', stop)
+process.on('SIGTERM', stop)
 
-console.log('caps: ', caps)
+console.log(`daemon listening on ${socketPath}`)

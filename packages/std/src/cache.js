@@ -1,4 +1,4 @@
-import { createController, is } from '@bassline/core'
+import { createController, is, consume } from '@bassline/core'
 import { leaf } from './ns.js'
 import { invariants, symbolEntries } from './shape.js'
 import { createCap } from './caps.js'
@@ -116,4 +116,16 @@ export function session(sendRaw, opts = {}) {
     return dispatchVia(local, lifted) ? undefined : lifted
   })
   return { lower, lift, send, dispatch, ctl, close }
+}
+
+export function sessionConnect({ send, recv }, callback) {
+  const sesh = session(send)
+  const { to, promise, ctl, close } = consume(recv, (msg, p) => {
+    const m = sesh.dispatch(msg)
+    if (m) p(m)
+  })
+  const cleanup = to(callback)
+  ctl.closes(sesh)
+  ctl.onClose(cleanup)
+  return { to, promise, ctl, close, send: sesh.send }
 }
