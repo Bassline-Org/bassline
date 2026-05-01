@@ -1,12 +1,4 @@
 packages:
   - apps/daemon
-  - packages/brain
   - packages/core
-  - packages/ontology
-  - packages/crypto
-  - packages/react
   - packages/std
-
-onlyBuiltDependencies:
-  - esbuild
-  - electron

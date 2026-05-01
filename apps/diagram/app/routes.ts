@@ -1,3 +1,0 @@
-import { type RouteConfig, index, route } from '@react-router/dev/routes'
-
-export default [index('routes/home.tsx'), route('sheet/:name', 'routes/sheet.$name.tsx')] satisfies RouteConfig
