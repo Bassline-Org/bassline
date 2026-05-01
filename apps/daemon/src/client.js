@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { connect } from '@bassline/core/transports/socket'
 import { sessionConnect } from '@bassline/std/cache'
-import { send as sendCap, reply, reject, enrich } from '@bassline/std/caps'
+import { send as sendCap, enrich } from '@bassline/std/caps'
 import { PortLike, Request, Ping, matches } from '@bassline/std/roles'
 
 const [, , socketPath = '/tmp/bassline.sock'] = process.argv
@@ -10,19 +10,16 @@ const conn = connect({ path: socketPath })
 
 let subscribed = false
 
-const onDaemon = matches(PortLike, daemon => {
+const onSubscribe = matches(PortLike, sub => {
+  if (sub.msg.name !== 'subscribe') return
   if (subscribed) return
   subscribed = true
-  const subReq = enrich({ cmd: 'subscribe' }, [
-    [reply, ack => console.log('subscribed:', ack.description)],
-    [reject, err => console.log('rejected:', err)],
-    [sendCap, describe],
-  ])
-  daemon.send(subReq)
-  console.log('subscribe request sent')
+  const subReq = enrich({}, [[sendCap, describe]])
+  sub.send(subReq)
+  console.log('subscription request sent')
 })
 
-sessionConnect(conn, onDaemon)
+sessionConnect(conn, onSubscribe)
 
 function describe(item) {
   if (item.removed) {

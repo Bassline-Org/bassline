@@ -5,3 +5,4 @@ export type Interval = { min: number; max: number }
 export type Uri = { href: string }
 export type Semver = { major: number; minor: number; patch: number }
 export type Ordering = 'gt' | 'lt' | 'eq' | 'nc'
+export type IsShaped<T> = (v: unknown) => v is T

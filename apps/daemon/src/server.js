@@ -1,23 +1,12 @@
 #!/usr/bin/env node
-import { propagator, cell, consume } from '@bassline/core'
+import { cell, consume } from '@bassline/core'
 import { serve } from '@bassline/core/serve/tcp'
-import { session } from '@bassline/std/cache'
-import { conforms, invariants } from '@bassline/std/shape'
-import {
-  send as sendCap,
-  reply,
-  reject,
-  close as closeCap,
-  ping,
-  cancel,
-  enrich,
-} from '@bassline/std/caps'
+import { send, close } from '@bassline/std/caps'
+import { Msg, Cache } from '@bassline/std/message'
 
 const [, , socketPath = '/tmp/bassline.sock'] = process.argv
 
 const { connections, close: stopServer } = serve({ path: socketPath })
-
-const feed = propagator()
 
 const known = cell((state, inc, update) => {
   const { removed, id } = inc
@@ -27,68 +16,53 @@ const known = cell((state, inc, update) => {
     update(state)
   } else {
     if (state.has(id)) return
-    state.set(inc.id, inc)
+    state.set(id, inc)
     update(state)
   }
 }, new Map())
 
-feed.to(known.send)
-
 let counter = 0
 const newId = () => `i${++counter}`
 
-const hasAnyCap = msg =>
-  [sendCap, reply, reject, closeCap, ping, cancel].some(c => c.check(msg))
-
 consume(connections, conn => {
-  const sesh = session(conn.send)
-  conn.ctl.closes(sesh)
-  sesh.ctl.onClose(() => console.log('client left'))
+  const local = new Cache()
+  const remote = new Cache()
+  conn.ctl.onClose(() => local.clear())
+  conn.ctl.onClose(() => remote.clear())
 
-  const subscribeCmd = invariants([
-    [conforms({ cmd: 'subscribe' }), 'not command shaped'],
-    [reply.check, 'missing reply cap'],
-    [sendCap.check, 'missing send cap'],
-  ])
+  const sendRaw = msg => local.sendRaw(msg, conn.send)
 
-  function archive(msg) {
-    const id = newId()
-    feed.send({ id, ...msg })
-    sesh.ctl.onClose(() => feed.send({ id, removed: true }))
-  }
+  const archive = new Msg()
+    .merge({ name: 'archive', description: 'submit intros for the feed' })
+    .grant(send.spelling, intro => {
+      const id = newId()
+      known.send(intro.copy({ id }))
+      conn.ctl.onClose(() => known.send(new Msg({ id, removed: true })))
+    })
+    .grant(close.spelling, archive.close)
 
-  function subscribe(msg) {
-    const deliver = item => sendCap.invoke(msg, item)
-    const cleanup = feed.to(deliver)
-    sesh.ctl.onClose(cleanup)
-    for (const [_id, intro] of known.value()) deliver(intro)
-    reply.invoke(msg, { description: 'subscribed' })
-  }
-
-  function handleIncoming(msg) {
-    if (subscribeCmd.test(msg)) return subscribe(msg)
-    if (hasAnyCap(msg)) return archive(msg)
-    console.log('unhandled:', msg)
-  }
-
-  sesh.send(
-    enrich({ description: 'bassline daemon — contribute or subscribe' }, [
-      [sendCap, handleIncoming],
-      [closeCap, () => conn.close()],
-    ])
-  )
+  const subscribe = new Msg()
+    .merge({ name: 'subscribe', description: 'be sent feed events' })
+    .grant(send.spelling, req => {
+      const cleanup = known.to(item => req.invoke(send.spelling, item))
+      conn.ctl.onClose(cleanup)
+      for (const [_id, intro] of known.value()) req.invoke(send.spelling, intro)
+    })
+    .grant(close.spelling, subscribe.close)
 
   consume(conn.recv, msg => {
-    const m = sesh.dispatch(msg)
-    if (m) console.log('unhandled raw:', m)
+    const bound = remote.fromRaw(msg, sendRaw)
+    local.dispatchVia(bound)
   })
+
+  local.sendRaw(archive, conn.send).sendRaw(subscribe, conn.send)
 
   console.log('peer connected')
 })
 
 const stop = () => {
   stopServer()
-  feed.close()
+  known.close()
 }
 process.on('SIGINT', stop)
 process.on('SIGTERM', stop)

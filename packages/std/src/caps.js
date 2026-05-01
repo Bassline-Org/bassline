@@ -53,7 +53,7 @@ export function createCap(spelling) {
     }
   }
 
-  return { symbol, grant, invoke, check }
+  return { symbol, grant, invoke, check, spelling }
 }
 
 /**
