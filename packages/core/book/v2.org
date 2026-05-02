@@ -233,6 +233,7 @@ propagator, as well as it's lifecycle.
         if (is.eof(msg)) break
         m.invoke('send', msg)
       }
+      m.close()
       m.invoke('close')
     })()
     return [m, {to, promise}]

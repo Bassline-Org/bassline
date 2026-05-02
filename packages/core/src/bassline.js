@@ -281,6 +281,7 @@ export function consume(recv, callback) {
       if (is.eof(msg)) break
       m.invoke('send', msg)
     }
+    m.close()
     m.invoke('close')
   })()
   return [m, { to, promise }]
