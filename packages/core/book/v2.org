@@ -481,41 +481,59 @@ and skip framing entirely.
 :header-args: :tangle ../src/frame/jsonl.js
 :END:
 
-Framing is separated from any specific transport. =readFrame= bridges
-a byte-level =recv= to a message-level =send=: it consumes chunks,
-accumulates them in a buffer, splits on newlines, and emits parsed
-messages. =format= is a plain function that serializes a message as a
-JSON line.
+Framing is separated from any specific transport.
+
+The =reader= propagator builds a propagator expecting messages with data
+matching: ={scalar: string}=. It will parse those strings into a buffer,
+propagating messages it parses without issue.
+On error, we simply console.warn for now. Though this can be replaced.
+One input chunk may produce zero or many messages.
+
+=format= is a plain function that serializes a message as a JSON line. This
+is used on the outgoing side to serialize before writing.
 
 #+begin_src js
-  import { message, consume } from '../bassline.js'
+    import { propagator, is, msg } from '../bassline.js'
 
-  export function readFrame(recv) {
-    let buffer = ''
-    return consume(recv, (chunk, send) => {
-      buffer += chunk
-      let nl
-      while ((nl = buffer.indexOf('\n')) !== -1) {
-        const line = buffer.slice(0, nl)
-        buffer = buffer.slice(nl + 1)
-        if (!line) continue
-        try {
-          send(message(JSON.parse(line)))
-        } catch (e) {
-          console.error('readFrame parse error: ', e)
+    const description = `\
+  I am a reader.
+  I read messages into a buffer, parsed as JSONL values.
+  I can be sent messages like {scalar: string}.
+  I emit parsed messages.`
+
+    const validChunk = m => m.conforms({scalar: is.string})
+
+    export function reader() {
+      let buffer = ''
+      const [m, to] = propagator((aMsg, send) => {
+        if(!validChunk(aMsg)) return
+        buffer += aMsg.get('scalar')
+        let nl
+        while ((nl = buffer.indexOf('\n')) !== -1) {
+          const line = buffer.slice(0, nl)
+          buffer = buffer.slice(nl + 1)
+          if (!line) continue
+          try {
+            send(msg(JSON.parse(line)))
+          } catch (e) {
+            console.error('readFrame parse error: ', e)
+          }
         }
+      })
+      m.merge({description})
+      return [m, to]
+    }
+
+    export const format = aMsg => {
+      let data = aMsg
+      if(is.msg(aMsg)) {
+        data = aMsg.data
       }
-    })
-  }
+      return JSON.stringify(data) + '\n'
+    }
 
-  export const format = msg => JSON.stringify(msg) + '\n'
-
-  export default { read: readFrame, format }
+    export default { reader, format }
 #+end_src
-
-=readFrame= fires off a =consume= loop in the background. One input
-chunk may produce zero or many messages. =format= is used on the
-outgoing side to serialize before writing.
 
 *** Socket
 :PROPERTIES:
@@ -529,26 +547,36 @@ the socket.
 
 #+begin_src js
   import net from 'node:net'
-  import { port, createController } from '../bassline.js'
+  import { msg, port } from '../bassline.js'
   import defaultFrame from '../frame/jsonl.js'
 
-  export function fromSocket(socket, frame = defaultFrame) {
-    const { close, ctl } = createController()
-    const raw = port()
-    const msgs = port()
-    frame.read(raw.recv).to(msgs.send)
+  const description = `\
+  I am a socket.
+  I allow interactions with socket-like interfaces.
+  Any messages I am sent, is forwarded over the wire as data.`
 
-    socket.on('data', chunk => raw.send(chunk.toString()))
+  export function fromSocket(socket, frame = defaultFrame) {
+    const outgoing = msg({description}, {send})
+    const [reader, onRead] = frame.reader()
+    const [msgs, recv] = port()
+    onRead(m => msgs.send(m))
+
+    function send(m) {
+      socket.write(frame.format(m))
+    }
+    function close() {
+      outgoing.close()
+    }
+
+    outgoing.ctl.closes(reader, msgs)
+    outgoing.ctl.onClose(() => socket.destroy())
+
+    socket.on('data', chunk => reader.send(msg({scalar: chunk.toString()})))
     socket.on('close', close)
     socket.on('end', close)
     socket.on('error', close)
 
-    ctl.closes(raw, msgs)
-    ctl.onClose(() => socket.destroy())
-
-    const send = ctl.fn(msg => void(socket.write(frame.format(msg))))
-
-    return { send, recv: msgs.recv, ctl, close }
+    return [outgoing, recv]
   }
 
   export function connect(options = {}, frame = defaultFrame) {
@@ -568,23 +596,30 @@ connections. Each connection is itself a port, produced by
 #+begin_src js
   import nodeNet from 'node:net'
   import { fromSocket } from '../transports/socket.js'
-  import { port, createController } from '../bassline.js'
+  import { msg } from '../bassline.js'
   import defaultFrame from '../frame/jsonl.js'
 
-  export function serve(options = {}, frame = defaultFrame) {
-    const { ctl, close } = createController()
-    const p = port()
+  const description = `\
+  I am a server.
+  I handle incoming connections as ports.`
+
+  export function serve(onConnect, options = {}, frame = defaultFrame) {
+    const m = msg({description, options})
+
     const server = nodeNet.createServer(socket => {
-      const clientPort = fromSocket(socket, frame)
-      ctl.closes(clientPort)
-      p.send(clientPort)
+      const [client, recv] = fromSocket(socket, frame)
+      m.ctl.closes(client)
+      onConnect([client, recv])
     })
 
-    ctl.closes(server, p)
+    m.ctl.closes(server)
     server.listen(options)
+
+    const close = () => m.close()
     server.on('close', close)
     server.on('error', close)
-    return { connections: p.recv, recv: p.recv, server, close, ctl }
+
+    return [m, server]
   }
 #+end_src
 
@@ -600,20 +635,26 @@ core.
 
 #+begin_src js
   import { fromWebSocket } from '../transports/websocket.js'
-  import { port, createController } from '../bassline.js'
+  import { msg } from '../bassline.js'
 
-  export function serve(wss) {
-    const { ctl, close } = createController()
-    const p = port()
-    ctl.closes(p, wss)
+  const description = `\
+  I am a web socket server.
+  I behave similar to a normal server,
+  but over web sockets. Go figure!`
+
+  export function serve(wss, onConnect) {
+    const m = msg({description})
+    m.ctl.closes(wss)
     wss.on('connection', ws => {
-      const client = fromWebSocket(ws)
-      ctl.closes(client)
-      p.send(client)
+      const [client, recv] = fromWebSocket(ws)
+      m.ctl.closes(client)
+      onConnect([client, recv])
     })
+    const close = () => m.ctl.close()
     wss.on('close', close)
     wss.on('error', close)
-    return { recv: p.recv, wss, ctl, close }
+
+    return [m, wss]
   }
 #+end_src
 
@@ -628,24 +669,33 @@ native =WebSocket=, in Node.js with the =ws= package, and for
 =RTCDataChannel= since it has the same event interface.
 
 #+begin_src js
-  import { port, message, createController } from '../bassline.js'
+  import { port, msg } from '../bassline.js'
+
+  const description = `I am a web socket.`
 
   export function fromWebSocket(ws) {
-    const { ctl, close } = createController()
-    const p = port()
+    const outgoing = msg({description})
+    const [msgs, recv] = port()
     ws.addEventListener('message', e => {
       try {
-        p.send(message(JSON.parse(e.data)))
+        msgs.send(msg(JSON.parse(e.data)))
       } catch (e) {
         console.error('failed to parse: ', e)
       }
     })
+
+    const close = () => outgoing.close()
     ws.addEventListener('close', close)
     ws.addEventListener('error', close)
-    ctl.closes(ws, p)
-    const send = ctl.fn(msg => void(ws.send(JSON.stringify(msg))))
 
-    return { recv: p.recv, send, ctl, close }
+    function send(m) {
+      const data = m.data
+      if(data) ws.send(JSON.stringify(data))
+    }
+    outgoing.grant('send', send)
+    outgoing.ctl.closes(msgs, ws)
+
+    return [outgoing, recv]
   }
 #+end_src
 
@@ -659,16 +709,22 @@ clone. Objects cross the boundary without serialization. Works with
 =Worker=, =MessagePort=, =SharedWorker.port=, and =BroadcastChannel=.
 
 #+begin_src js
-  import { port, message, createController } from '../bassline.js'
+  import { msg, port } from '../bassline.js'
 
+  const description = 'I am a message port.'
   export function fromPort(messagePort) {
-    const { ctl, close } = createController()
-    const p = port()
-    messagePort.onmessage = e => p.send(message(e.data))
-    messagePort.onmessageerror = () => close()
-    ctl.closes(p, messagePort)
-    const send = ctl.fn(msg => messagePort.postMessage(msg))
-    return { send, recv: p.recv, ctl, close }
+    const outgoing = msg({description})
+    const [msgs, recv] = port()
+    messagePort.onmessage = e => msgs.send(msg(e.data))
+    messagePort.onmessageerror = () => outgoing.close()
+
+    outgoing.ctl.closes(msgs, messagePort)
+
+    outgoing.grant('send', msg => {
+      const data = msg.data
+      if(data) messagePort.postMessage(data)
+    })
+    return [outgoing, recv]
   }
 #+end_src
 
@@ -682,24 +738,27 @@ produce a port of messages.
 
 #+begin_src js
   import readline from 'node:readline'
-  import { port, createController } from '../bassline.js'
+  import { port, msg } from '../bassline.js'
   import defaultFrame from '../frame/jsonl.js'
 
+  const description = 'I am a stdio port'
+
   export function fromStdio(frame = defaultFrame) {
-    const { ctl, close } = createController()
-    const raw = port()
-    const msgs = port()
     const rl = readline.createInterface({ input: process.stdin })
 
-    const send = ctl.fn(msg => process.stdout.write(frame.format(msg)))
+    const [reader, onRead] = frame.reader()
+    const [msgs, recv] = port()
 
-    ctl.closes(raw, msgs, rl)
+    onRead(v => msgs.send(v))
 
-    rl.on('line', line => raw.send(line + '\n'))
-    rl.on('close', close)
-    frame.read(raw.recv).to(msgs.send)
+    const outgoing = msg({description})
+      .grant('send', m => process.stdout.write(frame.format(m)))
 
-    return {recv: msgs.recv, send, ctl, close}
+    outgoing.ctl.closes(msgs, rl, reader)
+
+    rl.on('line', line => reader.send(msg({scalar: line + '\n'})))
+    rl.on('close', () => outgoing.close())
+    return [outgoing, recv]
   }
 #+end_src
 

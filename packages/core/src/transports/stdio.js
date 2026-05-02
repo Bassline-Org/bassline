@@ -1,20 +1,24 @@
 import readline from 'node:readline'
-import { port, createController } from '../bassline.js'
+import { port, msg } from '../bassline.js'
 import defaultFrame from '../frame/jsonl.js'
 
+const description = 'I am a stdio port'
+
 export function fromStdio(frame = defaultFrame) {
-  const { ctl, close } = createController()
-  const raw = port()
-  const msgs = port()
   const rl = readline.createInterface({ input: process.stdin })
 
-  const send = ctl.fn(msg => process.stdout.write(frame.format(msg)))
+  const [reader, onRead] = frame.reader()
+  const [msgs, recv] = port()
 
-  ctl.closes(raw, msgs, rl)
+  onRead(v => msgs.send(v))
 
-  rl.on('line', line => raw.send(line + '\n'))
-  rl.on('close', close)
-  frame.read(raw.recv).to(msgs.send)
+  const outgoing = msg({ description }).grant('send', m =>
+    process.stdout.write(frame.format(m))
+  )
 
-  return { recv: msgs.recv, send, ctl, close }
+  outgoing.ctl.closes(msgs, rl, reader)
+
+  rl.on('line', line => reader.send(msg({ scalar: line + '\n' })))
+  rl.on('close', () => outgoing.close())
+  return [outgoing, recv]
 }

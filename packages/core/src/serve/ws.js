@@ -1,16 +1,22 @@
 import { fromWebSocket } from '../transports/websocket.js'
-import { port, createController } from '../bassline.js'
+import { msg } from '../bassline.js'
 
-export function serve(wss) {
-  const { ctl, close } = createController()
-  const p = port()
-  ctl.closes(p, wss)
+const description = `\
+I am a web socket server.
+I behave similar to a normal server,
+but over web sockets. Go figure!`
+
+export function serve(wss, onConnect) {
+  const m = msg({ description })
+  m.ctl.closes(wss)
   wss.on('connection', ws => {
-    const client = fromWebSocket(ws)
-    ctl.closes(client)
-    p.send(client)
+    const [client, recv] = fromWebSocket(ws)
+    m.ctl.closes(client)
+    onConnect([client, recv])
   })
+  const close = () => m.ctl.close()
   wss.on('close', close)
   wss.on('error', close)
-  return { recv: p.recv, wss, ctl, close }
+
+  return [m, wss]
 }

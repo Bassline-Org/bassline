@@ -22,10 +22,10 @@ export interface Ctl {
 }
 export function createController(): { close: Close; ctl: Ctl }
 
-export type MsgData = Record<string, unknown>
-export type CapsObj = Record<string, Send<unknown>>
+export type Data = Record<string, unknown>
+export type Caps = Record<string, Send<unknown>>
 
-export class Msg<D extends MsgData = Data, C extends Caps = Caps> {
+export class Msg<D extends Data = {}, C extends Caps = {}> {
   data: D
   caps: Map<keyof C, C[keyof C]>
   ctl: Ctl

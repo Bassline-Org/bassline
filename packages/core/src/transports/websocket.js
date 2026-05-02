@@ -1,19 +1,28 @@
-import { port, message, createController } from '../bassline.js'
+import { port, msg } from '../bassline.js'
+
+const description = `I am a web socket.`
 
 export function fromWebSocket(ws) {
-  const { ctl, close } = createController()
-  const p = port()
+  const outgoing = msg({ description })
+  const [msgs, recv] = port()
   ws.addEventListener('message', e => {
     try {
-      p.send(message(JSON.parse(e.data)))
+      msgs.send(msg(JSON.parse(e.data)))
     } catch (e) {
       console.error('failed to parse: ', e)
     }
   })
+
+  const close = () => outgoing.close()
   ws.addEventListener('close', close)
   ws.addEventListener('error', close)
-  ctl.closes(ws, p)
-  const send = ctl.fn(msg => void ws.send(JSON.stringify(msg)))
 
-  return { recv: p.recv, send, ctl, close }
+  function send(m) {
+    const data = m.data
+    if (data) ws.send(JSON.stringify(data))
+  }
+  outgoing.grant('send', send)
+  outgoing.ctl.closes(msgs, ws)
+
+  return [outgoing, recv]
 }

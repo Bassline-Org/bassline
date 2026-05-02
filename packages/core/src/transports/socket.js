@@ -1,24 +1,34 @@
 import net from 'node:net'
-import { port, createController } from '../bassline.js'
+import { msg, port } from '../bassline.js'
 import defaultFrame from '../frame/jsonl.js'
 
-export function fromSocket(socket, frame = defaultFrame) {
-  const { close, ctl } = createController()
-  const raw = port()
-  const msgs = port()
-  frame.read(raw.recv).to(msgs.send)
+const description = `\
+I am a socket.
+I allow interactions with socket-like interfaces.
+Any messages I am sent, is forwarded over the wire as data.`
 
-  socket.on('data', chunk => raw.send(chunk.toString()))
+export function fromSocket(socket, frame = defaultFrame) {
+  const outgoing = msg({ description }, { send })
+  const [reader, onRead] = frame.reader()
+  const [msgs, recv] = port()
+  onRead(m => msgs.send(m))
+
+  function send(m) {
+    socket.write(frame.format(m))
+  }
+  function close() {
+    outgoing.close()
+  }
+
+  outgoing.ctl.closes(reader, msgs)
+  outgoing.ctl.onClose(() => socket.destroy())
+
+  socket.on('data', chunk => reader.send(msg({ scalar: chunk.toString() })))
   socket.on('close', close)
   socket.on('end', close)
   socket.on('error', close)
 
-  ctl.closes(raw, msgs)
-  ctl.onClose(() => socket.destroy())
-
-  const send = ctl.fn(msg => void socket.write(frame.format(msg)))
-
-  return { send, recv: msgs.recv, ctl, close }
+  return [outgoing, recv]
 }
 
 export function connect(options = {}, frame = defaultFrame) {
