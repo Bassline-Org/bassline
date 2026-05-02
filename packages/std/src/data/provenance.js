@@ -1,6 +1,6 @@
 import { is } from '@bassline/core'
-import { conforms } from '../shape.js'
 
-export const isSourced = conforms({
-  source: is.string,
-})
+export const isSourced = m =>
+  m.conforms({
+    source: is.string,
+  })

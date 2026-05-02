@@ -1,16 +1,11 @@
-/** @import { IsShaped } from "./types" */
-import { is } from '@bassline/core'
-import { conforms, ensure } from '../shape.js'
+import { is, satisfiesAll } from '@bassline/core'
 
-// ==== capabilities as data ====
-/**
- * @type {IsShaped<{capabilities: Record<string, string>}>}
- */
-export const isCapable = conforms({
-  capabilities: ensure([is.object, v => Object.values(v).every(is.string)]),
-})
-// ==== invoking a cap ====
-/**
- * @type {IsShaped<{via: string}>}
- */
-export const isVia = conforms({ via: is.string })
+export const isCapable = msg =>
+  msg.conforms({
+    capabilities: satisfiesAll([
+      is.object,
+      v => Object.values(v).every(is.string),
+    ]),
+  })
+
+export const isVia = msg => msg.conforms({ via: is.string })

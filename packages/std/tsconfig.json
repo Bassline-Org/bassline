@@ -17,6 +17,11 @@
     "rootDir": "./src",
     "outDir": "./dist"
   },
-  "include": ["src/**/*.js", "src/**/*.jsx", "src/**/*.d.ts"],
+  "include": [
+    "src/**/*.js",
+    "src/**/*.jsx",
+    "src/**/*.d.ts",
+    "purgatory/ns.js"
+  ],
   "exclude": ["**/*.test.js", "**/test/**"]
 }

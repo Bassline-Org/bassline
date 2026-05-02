@@ -72,36 +72,3 @@ export function namespace(defaultSize) {
     at: ctl.fn(at),
   }
 }
-
-/**
- *
- * @param {Namespace} ns
- * @returns {Leaf}
- */
-export function router(ns) {
-  const l = leaf(m => {
-    const { dest, ...msg } = m
-    if (typeof dest !== 'string') return
-    if (dest !== 'messages') ns.common.messages.port.send(m)
-    ns.at(dest).port.send(msg)
-  })
-  const { ctl, close, send } = l
-  const sendTo = (dest, msg = {}) => send({ ...msg, dest })
-  ns.ctl.closes(l)
-  return { ctl, close, send, sendTo }
-}
-
-/**
- *
- * a leaf participant
- * @param {Send} fn
- * @returns {{send: Send, ctl: Ctl, close: Close}}
- */
-export const leaf = fn => {
-  const { ctl, close } = createController()
-  /**
-   * @type {Revocable<Send>}
-   */
-  const send = ctl.fn(msg => void fn(msg))
-  return { ctl, close, send }
-}

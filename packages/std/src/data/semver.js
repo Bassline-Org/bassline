@@ -1,9 +1,8 @@
 //@ts-check
-import { is, cell } from '@bassline/core'
-import { invariants, failure, conforms, merge } from '../shape.js'
+import { is, cell, invariants, failure, msg } from '@bassline/core'
 /**
 @import { Semver, Ordering } from "./types"
-@import { Send, Message } from "@bassline/core"
+@import { Send, Msg } from "@bassline/core"
  */
 
 /**
@@ -13,23 +12,23 @@ import { invariants, failure, conforms, merge } from '../shape.js'
  * @returns {Semver}
  */
 export function semver(major = 0, minor = 0, patch = 0) {
-  const m = { major, minor, patch }
+  const m = msg({ major, minor, patch })
   assertSemver(m)
   return m
 }
 
 /**
-@type {(versioned: Semver, field: keyof Semver) => Semver}
+@type {(versioned: Semver, field: keyof Semver['data']) => Semver}
  */
 export function bump(versioned, field) {
-  const { major, minor, patch } = versioned
+  const { major, minor, patch } = versioned.data
   switch (field) {
     case 'major':
-      return merge([versioned, semver(major + 1, 0, 0)])
+      return versioned.merge({ major: major + 1, minor: 0, patch: 0 })
     case 'minor':
-      return merge([versioned, semver(major, minor + 1, 0)])
+      return versioned.merge({ major, minor: minor + 1, patch: 0 })
     case 'patch':
-      return merge([versioned, semver(major, minor, patch + 1)])
+      return versioned.merge({ major, minor, patch: patch + 1 })
     default:
       console.warn('unknown bump: ', field)
       return versioned
@@ -69,7 +68,8 @@ export function minVersion(a, b) {
 /**
 @type {(a: Semver, b: Semver) => Ordering}
  */
-export function cmpSemver(a, b) {
+export function cmpSemver(msgA, msgB) {
+  const [a, b] = [msgA.data, msgB.data]
   const result = a.major - b.major || a.minor - b.minor || a.patch - b.patch
   if (result > 0) return 'gt'
   if (result === 0) return 'eq'
@@ -88,11 +88,17 @@ export const assertVersionNum = invariants([
 ])
 export const assertSemver = invariants([
   [
-    conforms({
-      major: assertVersionNum,
-      minor: assertVersionNum,
-      patch: assertVersionNum,
-    }),
+    /**
+     *
+     * @param {Msg} m
+     * @returns
+     */
+    m =>
+      m.conforms({
+        major: assertVersionNum,
+        minor: assertVersionNum,
+        patch: assertVersionNum,
+      }),
     'invalid semver',
   ],
 ])
@@ -112,6 +118,11 @@ export function versionMerge(acc, inc, update) {
 }
 
 /**
- * @param {Message} init
+ * @param {Msg} init
  */
-export const versioned = init => cell(versionMerge, merge([semver(), init]))
+export function versioned(init) {
+  if (!isSemver(init)) {
+    init.merge(semver().data)
+  }
+  return cell(versionMerge, init)
+}

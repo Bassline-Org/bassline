@@ -1,14 +1,22 @@
-import { is } from '@bassline/core'
-import { invariants, conforms } from '../shape.js'
+import { is, invariants, msg } from '@bassline/core'
 
 export const assertInterval = invariants([
-  [conforms({ min: is.number, max: is.number }), 'invalid interval shape'],
-  [({ min, max }) => min <= max, 'min must be <= max'],
+  [
+    m => m.conforms({ min: is.number, max: is.number }),
+    'invalid interval shape',
+  ],
+  [
+    m => {
+      const { min, max } = m.data
+      return min <= max
+    },
+    'min must be <= max',
+  ],
 ])
 export const isInterval = assertInterval.test
 
 export function interval(min, max) {
-  const m = { min, max }
+  const m = msg({ min, max })
   assertInterval(m)
   return m
 }

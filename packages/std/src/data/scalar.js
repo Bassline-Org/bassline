@@ -1,10 +1,9 @@
-import { isScalarType, conforms, failure } from '../shape.js'
+import { is, msg, failure } from '@bassline/core'
 
-export const isScalar = conforms({ scalar: isScalarType })
+export const isScalar = m => m.conforms({ scalar: is.scalar })
 export function scalar(value) {
-  const fmt = val => ({ scalar: val })
-
   if (isScalar(value)) return value
-  if (isScalarType(value)) return fmt(value)
+  const m = msg()
+  if (is.scalar(value)) return m.merge({ scalar: value })
   throw failure(`Invalid scalar: ${JSON.stringify(value)}`)
 }

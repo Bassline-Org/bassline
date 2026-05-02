@@ -45,6 +45,8 @@ export function invariants(preds) {
   return assert
 }
 
+export const satisfiesAll = preds => val => preds.every(p => p(val))
+
 export function conforms(description) {
   if (!is.object(description)) throw failure('conform: invalid description')
 
@@ -62,7 +64,7 @@ export function conforms(description) {
     throw failure(`conform: unknown descriptor key: ${key}, val: ${val}`)
   }
 
-  return val => predicates.every(p => p(val))
+  return satisfiesAll(predicates)
 }
 
 export function createController() {
@@ -104,9 +106,7 @@ const validData = invariants([
 ])
 
 export class Msg {
-  /** @type {Record<string, unknown>} */
   data = {}
-  /** @type {Map<string, Send>} */
   caps = new Map()
 
   constructor(data = {}, caps = {}) {
@@ -122,9 +122,6 @@ export class Msg {
     })
   }
 
-  /**
-   * @param {Record<string, unknown>} [data]
-   */
   copy(data = {}) {
     const msg = new Msg({ ...this.data, ...data })
     for (const [k, v] of this.caps) {
@@ -133,83 +130,47 @@ export class Msg {
     return msg
   }
 
-  /**
-   * @param {Cache} cache
-   */
   store(cache) {
     for (const [spelling, fn] of this.caps) {
       cache.storeCap(this, spelling, fn)
     }
   }
 
-  /**
-   * @template {typeof this['data']} T
-   * @param {T} data
-   */
   merge(data) {
-    /** @type { typeof this.data & T} */
     this.data = { ...this.data, ...data }
     return this
   }
 
-  /**
-   * @param {string} key
-   */
+  has(key) {
+    return key in this.data
+  }
+
+  hasKeys(keys) {
+    return keys.every(k => this.has(k))
+  }
+
   get(key) {
     return this.data[key]
   }
 
-  /**
-   * @param {string} key
-   */
   delete(key) {
     delete this.data[key]
     return this
   }
 
-  /**
-   * @param {string} key
-   */
-  has(key) {
-    return key in this.data
-  }
-
-  /**
-   *
-   * @param  {string[]} keys
-   */
-  hasKeys(keys) {
-    return keys.every(k => this.has(k))
-  }
-
-  /**
-   * @param {string} key
-   */
   hasCap(key) {
     return this.caps.has(key)
   }
 
-  /**
-   * @param {string[]} keys
-   */
   hasCaps(keys) {
     return keys.every(k => this.hasCap(k))
   }
 
-  /**
-   *
-   * @param {string} spelling
-   */
   revoke(spelling) {
     this.caps.delete(spelling)
     return this
   }
 
-  /**
-   *
-   * @param {string} spelling
-   * @param {Send} fn
-   */
   grant(spelling, fn) {
     validCapName(spelling)
     validCapFn(fn)
@@ -217,19 +178,11 @@ export class Msg {
     return this
   }
 
-  /**
-   * @param {object} obj
-   */
   grantAll(obj) {
     Object.entries(obj).forEach(([k, v]) => this.grant(k, v))
     return this
   }
 
-  /**
-   *
-   * @param {string} spelling
-   * @param {Message | Msg} [arg]
-   */
   invoke(spelling, arg = new Msg()) {
     validCapName(spelling)
     const cap = this.caps.get(spelling)
@@ -237,29 +190,15 @@ export class Msg {
     return this
   }
 
-  /**
-   * A helper to invoke the common send capability on a msg
-   * @param msg
-   */
   send(msg) {
     return this.invoke('send', msg)
   }
 
-  /**
-   *
-   * @param {unknown} description
-   */
   conforms(description) {
     return conforms(description)(this.data)
   }
 }
 
-/**
- *
- * @param {Message | Msg} data
- * @param {object} caps
- * @returns {Msg}
- */
 export function msg(data = {}, caps = {}) {
   if (is.msg(data)) return data.grantAll(caps)
   return new Msg(data, caps)
@@ -307,7 +246,9 @@ export function propagator(fn = (v, p) => p(v)) {
 
   m.grantAll({
     send: val => {
-      Promise.resolve(fn(val, propagate))
+      Promise.resolve(fn(val, propagate)).catch(e => {
+        throw e
+      })
     },
     close: m.close,
   })

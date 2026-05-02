@@ -1,131 +1,118 @@
-import { createController, is, consume } from '@bassline/core'
-import { leaf } from './ns.js'
-import { invariants, symbolEntries } from './shape.js'
-import { createCap } from './caps.js'
-import { isVia, isCapable } from './data/index.js'
+import { is, Msg, failure } from '@bassline/core'
 
-const assertValidSend = invariants([[is.fn, 'send must be a function']])
+export class Cache {
+  byMsg = new Map()
+  byId = new Map()
 
-export function capCache({ createId = () => crypto.randomUUID() } = {}) {
-  const { ctl, close } = createController()
-  const byId = new Map()
-  const bySend = new Map()
-
-  const storeFor = value => (is.fn(value) ? bySend : byId)
-  const get = value => storeFor(value).get(value)
-  const has = value => storeFor(value).has(value)
-  const revoke = value => {
-    const entry = get(value)
-    if (entry) entry.close()
+  clear() {
+    for (const msg of this.byMsg.keys()) {
+      msg.close()
+    }
+    this.byId.clear()
+    this.byMsg.clear()
   }
 
-  const assertValidId = invariants([
-    [is.string, 'id must be a string'],
-    [id => !has(id), 'id already parked'],
-  ])
+  toRaw(msg) {
+    if (!is.msg(msg)) throw failure('expected Msg')
+    if (!this.byMsg.has(msg)) {
+      this.store(msg)
+    }
+    const data = { ...msg.data }
+    const entries = this.entriesFor(msg)
 
-  function park(send, id = createId()) {
-    assertValidSend(send)
-    if (has(send)) return get(send)
-    assertValidId(id)
+    if (entries.size === 0) return data
+    const caps = {}
+    for (const { spelling, id } of entries) {
+      caps[spelling] = id
+    }
+    data.capabilities = caps
+    return data
+  }
 
-    const entry = { id, ...leaf(send) }
-    byId.set(id, entry)
-    bySend.set(send, entry)
+  /*
+   * takes a raw message and attaches capabilities
+   * It's important to note that the referenced capability from the data
+   * message is late bound and the underlying implementation isn't
+   * "owned" by that message. Instead the message owns a closure
+   * that dispatches via the cache.
+   */
+  fromRaw(rawData, delegate = null) {
+    const { capabilities, ...raw } = rawData
+    const caps = {}
+    if (capabilities) {
+      for (const [spelling, id] of Object.entries(capabilities)) {
+        caps[spelling] = msg => {
+          const m = msg.copy({ via: id })
+          if (delegate) delegate(m)
+          else this.dispatchVia(m)
+        }
+      }
+    }
+    const m = new Msg(raw, caps)
+    this.store(m)
+    return m
+  }
 
-    entry.ctl.onClose(() => {
-      byId.delete(id)
-      bySend.delete(send)
+  sendRaw(msg, send) {
+    send(this.toRaw(msg))
+    return this
+  }
+
+  dispatchVia(msg) {
+    const { via } = msg.data
+    if (!via) return this
+    const send = this.sendFor(via)
+    if (!send) return this
+    const m = msg.copy().delete('via')
+    send(m)
+  }
+
+  sendFor(id) {
+    const entry = this.byId.get(id)
+    if (entry) return entry.send
+  }
+
+  storeFor(value) {
+    if (is.msg(value)) return this.byMsg
+    if (is.string(value)) return this.byId
+    throw failure('invalid storeFor')
+  }
+
+  entriesFor(msg) {
+    if (!is.msg(msg)) throw failure('expected Msg')
+    let entries = this.byMsg.get(msg)
+    if (entries) return entries
+    if (!entries && msg.ctl.closed) return
+    entries = new Set()
+    this.byMsg.set(msg, entries)
+    msg.ctl.onClose(() => {
+      const entries = this.entriesFor(msg)
+      if (!entries) return
+      for (const entry of entries) {
+        this.byId.delete(entry.id)
+        entries.delete(entry)
+      }
+      this.byMsg.delete(msg)
     })
+    return entries
+  }
 
-    ctl.closes(entry)
+  storeCap(msg, spelling, send) {
+    if (!is.msg(msg)) throw failure('msg must be a Msg!')
+    const entries = this.entriesFor(msg)
+    if (!entries) return
+    for (const e of entries) {
+      if (e.send === send && e.spelling === spelling) return e
+    }
+    const id = crypto.randomUUID()
+    const entry = { id, send, msg, spelling }
+    entries.add(entry)
+    this.byId.set(entry.id, entry)
     return entry
   }
 
-  return {
-    ctl,
-    close,
-    park: ctl.fn(park),
-    get: ctl.fn(get),
-    has: ctl.fn(has),
-    revoke: ctl.fn(revoke),
+  store(msg) {
+    if (!is.msg(msg)) throw failure('expected Msg')
+    msg.store(this)
   }
-}
-
-export function reify(cache, msg, opts = {}) {
-  const { strip = true } = opts
-  const m = { ...msg }
-  for (const [sym, val] of symbolEntries(msg)) {
-    if (!is.fn(val)) continue
-    const spelling = Symbol.keyFor(sym) ?? sym.description
-    if (!spelling) continue
-    m.capabilities ??= {}
-    const entry = cache.park(val)
-    m.capabilities[spelling] = entry.id
-    if (strip) delete m[sym]
-  }
-  return m
-}
-
-export function bind(cache, send, msg) {
-  if (!isCapable(msg)) return msg
-  const { capabilities, ...m } = msg
-  let out = m
-
-  for (const [spelling, id] of Object.entries(capabilities)) {
-    const cap = createCap(spelling)
-
-    let entry = cache.get(id)
-    if (!entry) {
-      entry = cache.park(arg => send({ ...arg, via: id }), id)
-    }
-
-    out = cap.grant(out, entry.send)
-  }
-
-  return out
-}
-
-export function dispatchVia(cache, msg) {
-  if (!isVia(msg)) return false
-  const { via, ...m } = msg
-  const entry = cache.get(via)
-  if (!entry) return false
-  entry.send(m)
-  return true
-}
-
-export function session(sendRaw, opts = {}) {
-  const { ctl, close } = createController()
-  const local = capCache(opts.local)
-  const remote = capCache(opts.remote)
-  ctl.closes(local, remote)
-
-  // these are "outgoing" fns
-  // lower lets us go from closure caps to data
-  // send allows us to send the data-ified fversion outwards
-  const lower = ctl.fn((msg, opts) => reify(local, msg, opts))
-  const send = ctl.fn(msg => sendRaw(lower(msg)))
-  // these are "incoming" fns
-  // lift takes a data message and "lifts" to closure caps
-  // dispatch allows us to handle cap invocations by the "via" key
-  // otherwise returning a lifted message
-  const lift = ctl.fn(msg => bind(remote, send, msg))
-  const dispatch = ctl.fn(msg => {
-    const lifted = lift(msg)
-    return dispatchVia(local, lifted) ? undefined : lifted
-  })
-  return { lower, lift, send, dispatch, ctl, close }
-}
-
-export function sessionConnect({ send, recv }, callback) {
-  const sesh = session(send)
-  const { to, promise, ctl, close } = consume(recv, (msg, p) => {
-    const m = sesh.dispatch(msg)
-    if (m) p(m)
-  })
-  const cleanup = to(callback)
-  ctl.closes(sesh)
-  ctl.onClose(cleanup)
-  return { to, promise, ctl, close, send: sesh.send }
 }
