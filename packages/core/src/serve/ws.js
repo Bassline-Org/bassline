@@ -14,7 +14,7 @@ export function serve(wss, onConnect) {
     m.ctl.closes(client)
     onConnect([client, recv])
   })
-  const close = () => m.ctl.close()
+  const close = () => m.close()
   wss.on('close', close)
   wss.on('error', close)
 
