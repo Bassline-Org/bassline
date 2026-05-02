@@ -15,7 +15,7 @@ export function serve(wss, onConnect) {
     onConnect([client, recv])
   })
   const close = () => m.close()
-  wss.grant('close', close)
+  m.grant('close', close)
   wss.on('close', close)
   wss.on('error', close)
 
