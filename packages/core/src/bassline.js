@@ -1,36 +1,68 @@
 export const EOF = Symbol.for('$$BASSLINE_EOF$$')
-export function kindOf(v) {
-  if (v === null) return 'null'
-  if (v === undefined) return 'undefined'
-  if (v instanceof Promise) return 'promise'
-  if (Array.isArray(v)) return 'array'
-  return typeof v
-}
 
-const isa = kind => v => kindOf(v) === kind
+const scalarTypes = ['string', 'boolean', 'symbol', 'number']
 export const is = {
   eof: v => v === EOF,
   nil: v => v == null || Number.isNaN(v),
-  null: isa('null'),
-  undefined: isa('undefined'),
-  defined: v => !is.undefined(v),
-  promise: isa('promise'),
-  boolean: isa('boolean'),
-  number: v => isa('number')(v) && !Number.isNaN(v),
-  string: isa('string'),
-  fn: isa('function'),
-  symbol: isa('symbol'),
-  array: isa('array'),
-  object: isa('object'),
-  msg: v => is.object(v) && Object.getPrototypeOf(v) === Object.prototype,
+  null: v => v === null,
+  undefined: v => v === undefined,
+  promise: v => v instanceof Promise,
+  boolean: v => typeof v === 'boolean',
+  number: v => typeof v === 'number' && !Number.isNaN(v),
+  string: v => typeof v === 'string',
+  fn: v => typeof v === 'function',
+  symbol: v => typeof v === 'symbol',
+  array: v => Array.isArray(v),
+  object: v => typeof v === 'object' && v !== null,
+  msg: v => v instanceof Msg,
+  scalar: v => is.null(v) || scalarTypes.includes(typeof v),
 }
 
-export const lazy = fn => {
-  let value, called
-  return () => {
-    if (is.undefined(called)) ((value = fn()), (called = true))
+export class AssertionFailure extends Error {}
+export function failure(msg) {
+  return new AssertionFailure(msg)
+}
+
+export function invariants(preds) {
+  function assert(value) {
+    for (const [pred, msg = _v => 'assertion failed'] of preds) {
+      if (!pred(value)) {
+        if (is.fn(msg)) throw failure(msg(value))
+        throw failure(msg)
+      }
+    }
     return value
   }
+  assert.test = value => {
+    try {
+      assert(value)
+      return true
+    } catch (e) {
+      if (e instanceof AssertionFailure) return false
+      throw e
+    }
+  }
+  return assert
+}
+
+export function conforms(description) {
+  if (!is.object(description)) throw failure('conform: invalid description')
+
+  const predicates = [is.object]
+
+  for (const [key, val] of Object.entries(description)) {
+    if (is.fn(val)) {
+      predicates.push(obj => val(obj[key], obj))
+      continue
+    }
+    if (is.scalar(val)) {
+      predicates.push(obj => obj[key] === val)
+      continue
+    }
+    throw failure(`conform: unknown descriptor key: ${key}, val: ${val}`)
+  }
+
+  return val => predicates.every(p => p(val))
 }
 
 export function createController() {
@@ -46,14 +78,6 @@ export function createController() {
         ctl.onClose(() => c.close(), c?.ctl?.signal)
       }
     },
-    fn(aFn) {
-      if (!is.fn(aFn)) {
-        throw new Error('ctl.fn: must pass a function!')
-      }
-      let ref = aFn
-      ctl.onClose(() => (ref = null))
-      return (...args) => ref?.(...args)
-    },
     get closed() {
       return signal.aborted
     },
@@ -67,117 +91,286 @@ export function createController() {
 }
 
 export const delay = (ms = 1000) => new Promise(res => setTimeout(res, ms))
+const validCapName = invariants([[is.string, 'cap spelling must be a string']])
+const validCapFn = invariants([[is.fn, 'cap fn must be a function']])
+const validCaps = invariants([
+  [v => Object.keys(v).every(is.string), 'cap keys must be strings'],
+  [v => Object.values(v).every(is.fn), 'cap values must be functions'],
+])
+
+const validData = invariants([
+  [is.object, 'data must be an object'],
+  [v => !is.array(v), 'data cannot be an array'],
+])
+
+export class Msg {
+  /** @type {Record<string, unknown>} */
+  data = {}
+  /** @type {Map<string, Send>} */
+  caps = new Map()
+
+  constructor(data = {}, caps = {}) {
+    validData(data)
+    validCaps(caps)
+    const { ctl, close } = createController()
+    this.ctl = ctl
+    this.close = close
+    this.merge(data)
+    this.grantAll(caps)
+    this.ctl.onClose(() => {
+      this.caps.clear()
+    })
+  }
+
+  /**
+   * @param {Record<string, unknown>} [data]
+   */
+  copy(data = {}) {
+    const msg = new Msg({ ...this.data, ...data })
+    for (const [k, v] of this.caps) {
+      msg.grant(k, v)
+    }
+    return msg
+  }
+
+  /**
+   * @param {Cache} cache
+   */
+  store(cache) {
+    for (const [spelling, fn] of this.caps) {
+      cache.storeCap(this, spelling, fn)
+    }
+  }
+
+  /**
+   * @template {typeof this['data']} T
+   * @param {T} data
+   */
+  merge(data) {
+    /** @type { typeof this.data & T} */
+    this.data = { ...this.data, ...data }
+    return this
+  }
+
+  /**
+   * @param {string} key
+   */
+  get(key) {
+    return this.data[key]
+  }
+
+  /**
+   * @param {string} key
+   */
+  delete(key) {
+    delete this.data[key]
+    return this
+  }
+
+  /**
+   * @param {string} key
+   */
+  has(key) {
+    return key in this.data
+  }
+
+  /**
+   *
+   * @param  {string[]} keys
+   */
+  hasKeys(keys) {
+    return keys.every(k => this.has(k))
+  }
+
+  /**
+   * @param {string} key
+   */
+  hasCap(key) {
+    return this.caps.has(key)
+  }
+
+  /**
+   * @param {string[]} keys
+   */
+  hasCaps(keys) {
+    return keys.every(k => this.hasCap(k))
+  }
+
+  /**
+   *
+   * @param {string} spelling
+   */
+  revoke(spelling) {
+    this.caps.delete(spelling)
+    return this
+  }
+
+  /**
+   *
+   * @param {string} spelling
+   * @param {Send} fn
+   */
+  grant(spelling, fn) {
+    validCapName(spelling)
+    validCapFn(fn)
+    this.caps.set(spelling, fn)
+    return this
+  }
+
+  /**
+   * @param {object} obj
+   */
+  grantAll(obj) {
+    Object.entries(obj).forEach(([k, v]) => this.grant(k, v))
+    return this
+  }
+
+  /**
+   *
+   * @param {string} spelling
+   * @param {Message | Msg} [arg]
+   */
+  invoke(spelling, arg = new Msg()) {
+    validCapName(spelling)
+    const cap = this.caps.get(spelling)
+    if (cap) cap(arg)
+    return this
+  }
+
+  /**
+   * A helper to invoke the common send capability on a msg
+   * @param msg
+   */
+  send(msg) {
+    return this.invoke('send', msg)
+  }
+
+  /**
+   *
+   * @param {unknown} description
+   */
+  conforms(description) {
+    return conforms(description)(this.data)
+  }
+}
+
+/**
+ *
+ * @param {Message | Msg} data
+ * @param {object} caps
+ * @returns {Msg}
+ */
+export function msg(data = {}, caps = {}) {
+  if (is.msg(data)) return data.grantAll(caps)
+  return new Msg(data, caps)
+}
 export function port(size = Infinity) {
   const buffer = [],
     waiters = []
-  const { close, ctl } = createController()
-  ctl.onClose(() => {
+  const description = 'I am a port. I support buffered communication.'
+  const m = new Msg({ description })
+  m.grantAll({
+    send: msg => {
+      if (is.eof(msg)) throw new Error('Bassline EOF is reserved')
+      // resolve the promise if we have a waiter
+      if (waiters.length > 0) return waiters.shift()(msg)
+      // drop a message if we are over capabity
+      if (buffer.length >= size) buffer.shift()
+      // add the message to the buffer if we have capacity
+      if (size > 0) buffer.push(msg)
+    },
+    close: m.close,
+  })
+  m.ctl.onClose(() => {
     for (const w of waiters) w(EOF)
     waiters.length = 0
   })
-  const send = ctl.fn(msg => {
-    if (is.eof(msg)) throw new Error('Bassline EOF is reserved')
-    // resolve the promise if we have a waiter
-    if (waiters.length > 0) return waiters.shift()(msg)
-    // drop a message if we are over capabity
-    if (buffer.length >= size) buffer.shift()
-    // add the message to the buffer if we have capacity
-    if (size > 0) buffer.push(msg)
-  })
   function recv() {
     if (buffer.length > 0) return Promise.resolve(buffer.shift())
-    if (ctl.closed) return Promise.resolve(EOF)
+    if (m.ctl.closed) return Promise.resolve(EOF)
     return new Promise(resolve => waiters.push(resolve))
   }
-  return { send, recv, close, ctl }
+  return [m, recv]
 }
 
 export function propagator(fn = (v, p) => p(v)) {
-  const { close, ctl } = createController()
-  const targets = lazy(() => new Set())
-  const propagate = value => targets().forEach(t => t(value))
-  ctl.onClose(() => targets().clear())
-  const send = ctl.fn(val => {
-    Promise.resolve(fn(val, propagate))
+  const description = 'I am a propagator. I am a reactive inference machine.'
+  const m = new Msg({ description })
+  const targets = new Set()
+  const propagate = value => targets.forEach(t => t(value))
+  m.ctl.onClose(() => targets.clear())
+
+  const to = (...dests) => {
+    dests.forEach(d => targets.add(d))
+    return () => dests.forEach(d => targets.delete(d))
+  }
+
+  m.grantAll({
+    send: val => {
+      Promise.resolve(fn(val, propagate))
+    },
+    close: m.close,
   })
-  const to = ctl.fn((...dests) => {
-    dests.forEach(d => targets().add(d))
-    return () => dests.forEach(d => targets().delete(d))
-  })
-  return { send, to, close, ctl }
+
+  return [m, to]
 }
 
 export function cell(merge, init) {
+  const description = 'I am a cell. I am a propagator with state'
   let current = init
-  const { send, to, close, ctl } = propagator((incoming, propagate) => {
+  const [m, to] = propagator((incoming, propagate) => {
     merge(current, incoming, value => {
       current = value
       propagate(value)
     })
   })
-  return { send, to, close, ctl, value: () => current }
+  m.merge({ description })
+  return [m, { to, value: () => current }]
 }
 
 export function consume(recv, callback) {
-  const { send, to, ctl, close } = propagator(callback)
+  const [m, to] = propagator(callback)
+  const description =
+    'I am a consumed port. I am a propagator driven by a port.'
+  m.merge({ description })
   const promise = (async () => {
-    const closed = new Promise(resolve => ctl.onClose(() => resolve(EOF)))
-    while (!ctl.closed) {
+    const closed = new Promise(resolve => m.ctl.onClose(() => resolve(EOF)))
+    while (!m.ctl.closed) {
       const msg = await Promise.race([recv(), closed])
       if (is.eof(msg)) break
-      send(msg)
+      m.invoke('send', msg)
     }
-    close()
+    m.invoke('close')
   })()
-  return { to, ctl, close, promise }
+  return [m, { to, promise }]
 }
 
 export function net() {
+  const description =
+    'I am a net. I implement seamless multi-party communication.'
   const ports = new Set()
-  const nc = createController()
+  const netm = new Msg({ description })
 
-  const join = nc.ctl.fn(size => {
-    const fromNet = port(size)
-    const { recv, ctl, close } = fromNet
-    const send = ctl.fn(msg => {
-      ports.forEach(p => p !== fromNet && p.send(msg))
+  netm.grantAll({
+    send: msg => ports.forEach(p => p.invoke('send', msg)),
+    close: netm.close,
+  })
+
+  const join = size => {
+    const [fromNet, recv] = port(size)
+    const toNet = fromNet.copy().grant('send', msg => {
+      for (const p of ports) {
+        if (p === fromNet) continue
+        p.send(msg)
+      }
     })
     ports.add(fromNet)
-    nc.ctl.closes(fromNet)
-    ctl.onClose(() => ports.delete(fromNet))
-    return { recv, ctl, close, send }
-  })
+    netm.ctl.closes(fromNet)
+    fromNet.ctl.closes(toNet)
+    toNet.ctl.closes(fromNet)
+    fromNet.ctl.onClose(() => ports.delete(fromNet))
+    return [toNet, recv]
+  }
 
-  const send = nc.ctl.fn(msg => ports.forEach(p => p.send(msg)))
-
-  return { join, send, ctl: nc.ctl, close: nc.close }
-}
-
-export function message(content) {
-  if (is.undefined(content)) return {}
-  if (is.msg(content)) return { ...content }
-  return { body: content }
-}
-
-export const hasCap = (msg, name) => is.defined(msg[name]) && is.fn(msg[name])
-
-export function offer(handlers) {
-  const syms = Object.getOwnPropertySymbols(handlers)
-  return propagator((msg, propagate) => {
-    const enriched = { ...msg }
-    for (const sym of syms) {
-      enriched[sym] = m => void handlers[sym](m)
-    }
-    propagate(enriched)
-  })
-}
-
-export function accept(handlers) {
-  const syms = Object.getOwnPropertySymbols(handlers)
-  return propagator(async (msg, propagate) => {
-    for (const sym of syms) {
-      if (hasCap(msg, sym)) await handlers[sym](msg, msg[sym])
-    }
-    propagate(msg)
-  })
+  return [netm, join]
 }

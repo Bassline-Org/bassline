@@ -12,7 +12,7 @@
     "node": ">=18.0.0",
     "pnpm": ">=8.0.0"
   },
-  "packageManager": "pnpm@10.27.0",
+  "packageManager": "pnpm@10.33.2",
   "scripts": {
     "build": "pnpm -r build",
     "test": "pnpm -r test",
@@ -54,6 +54,7 @@
     "@fast-check/vitest": "^0.3.0",
     "@types/node": "^25.5.0",
     "@types/react": "^19.2.14",
+    "@vitest/coverage-v8": "^4.1.2",
     "eslint": "^9.39.4",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-jsdoc": "^61.7.1",
@@ -64,7 +65,6 @@
     "prettier": "^3.8.1",
     "typescript": "^5.9.3",
     "vitest": "^4.1.2",
-    "ws": "^8.20.0",
-    "@vitest/coverage-v8": "^4.1.2"
+    "ws": "^8.20.0"
   }
 }

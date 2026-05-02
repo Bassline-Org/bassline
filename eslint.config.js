@@ -63,6 +63,14 @@ export default [
     rules: sourceRules,
   },
   {
+    files: ['**/*.test.js'],
+    ignores: ['**/node_modules/**'],
+    languageOptions: {
+      globals: { ...sharedGlobals, expect: 'readonly' },
+    },
+    rules: sourceRules,
+  },
+  {
     ignores: ['**/node_modules/**', '**/*.d.ts'],
   },
 ]

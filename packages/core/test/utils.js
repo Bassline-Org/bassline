@@ -1,15 +1,15 @@
-import { port, cell, consume } from '../src/bassline.js'
+import { port, consume } from '../src/bassline.js'
 
 export async function collect(recv) {
-  const c = cell((current, incoming, update) => update([...current, incoming]), [])
-  const prop = consume(recv, c.send)
-  await prop.promise
-  return c.value()
+  const values = []
+  const [_, { promise }] = consume(recv, v => values.push(v))
+  await promise
+  return values
 }
 
 export function filledPort(values) {
-  const p = port()
-  values.forEach(p.send)
+  const [p, recv] = port()
+  values.forEach(v => p.send(v))
   p.close()
-  return p
+  return [p, recv]
 }

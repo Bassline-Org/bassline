@@ -1,6 +1,6 @@
 {
   "name": "@bassline/core",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Partial Information Programming",
   "type": "module",
   "types": "src/types.d.ts",
