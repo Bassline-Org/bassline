@@ -6,8 +6,8 @@
   "types": "src/types.d.ts",
   "exports": {
     ".": {
-      "default": "./src/index.js",
-      "types": "./src/types.d.ts"
+      "types": "./src/types.d.ts",
+      "default": "./src/index.js"
     },
     "./node": "./src/node.js",
     "./transports/socket": "./src/transports/socket.js",

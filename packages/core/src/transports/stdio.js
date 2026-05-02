@@ -12,9 +12,10 @@ export function fromStdio(frame = defaultFrame) {
 
   onRead(v => msgs.send(v))
 
-  const outgoing = msg({ description }).grant('send', m =>
-    process.stdout.write(frame.format(m))
-  )
+  const outgoing = msg({ description }).grantAll({
+    send: m => process.stdout.write(frame.format(m)),
+    close: () => outgoing.close(),
+  })
 
   outgoing.ctl.closes(msgs, rl, reader)
 

@@ -9,9 +9,12 @@ export function fromPort(messagePort) {
 
   outgoing.ctl.closes(msgs, messagePort)
 
-  outgoing.grant('send', msg => {
-    const data = msg.data
-    if (data) messagePort.postMessage(data)
+  outgoing.grantAll({
+    send: m => {
+      const data = m.data
+      if (data) messagePort.postMessage(data)
+    },
+    close: () => outgoing.close(),
   })
   return [outgoing, recv]
 }

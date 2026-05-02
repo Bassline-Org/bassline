@@ -20,6 +20,7 @@ export function serve(onConnect, options = {}, frame = defaultFrame) {
   server.listen(options)
 
   const close = () => m.close()
+  m.grant('close', close)
   server.on('close', close)
   server.on('error', close)
 

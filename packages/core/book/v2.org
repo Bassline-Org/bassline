@@ -233,8 +233,8 @@ propagator, as well as it's lifecycle.
         if (is.eof(msg)) break
         m.invoke('send', msg)
       }
-      m.close()
       m.invoke('close')
+      m.close()
     })()
     return [m, {to, promise}]
   }
@@ -494,46 +494,46 @@ One input chunk may produce zero or many messages.
 is used on the outgoing side to serialize before writing.
 
 #+begin_src js
-    import { propagator, is, msg } from '../bassline.js'
+  import { propagator, is, msg } from '../bassline.js'
 
-    const description = `\
+  const description = `\
   I am a reader.
   I read messages into a buffer, parsed as JSONL values.
   I can be sent messages like {scalar: string}.
   I emit parsed messages.`
 
-    const validChunk = m => m.conforms({scalar: is.string})
+  const validChunk = m => m.conforms({scalar: is.string})
 
-    export function reader() {
-      let buffer = ''
-      const [m, to] = propagator((aMsg, send) => {
-        if(!validChunk(aMsg)) return
-        buffer += aMsg.get('scalar')
-        let nl
-        while ((nl = buffer.indexOf('\n')) !== -1) {
-          const line = buffer.slice(0, nl)
-          buffer = buffer.slice(nl + 1)
-          if (!line) continue
-          try {
-            send(msg(JSON.parse(line)))
-          } catch (e) {
-            console.error('readFrame parse error: ', e)
-          }
+  export function reader() {
+    let buffer = ''
+    const [m, to] = propagator((aMsg, send) => {
+      if(!validChunk(aMsg)) return
+      buffer += aMsg.get('scalar')
+      let nl
+      while ((nl = buffer.indexOf('\n')) !== -1) {
+        const line = buffer.slice(0, nl)
+        buffer = buffer.slice(nl + 1)
+        if (!line) continue
+        try {
+          send(msg(JSON.parse(line)))
+        } catch (e) {
+          console.error('readFrame parse error: ', e)
         }
-      })
-      m.merge({description})
-      return [m, to]
-    }
-
-    export const format = aMsg => {
-      let data = aMsg
-      if(is.msg(aMsg)) {
-        data = aMsg.data
       }
-      return JSON.stringify(data) + '\n'
-    }
+    })
+    m.merge({description})
+    return [m, to]
+  }
 
-    export default { reader, format }
+  export const format = aMsg => {
+    let data = aMsg
+    if(is.msg(aMsg)) {
+      data = aMsg.data
+    }
+    return JSON.stringify(data) + '\n'
+  }
+
+  export default { reader, format }
 #+end_src
 
 *** Socket
@@ -557,7 +557,7 @@ the socket.
   Any messages I am sent, is forwarded over the wire as data.`
 
   export function fromSocket(socket, frame = defaultFrame) {
-    const outgoing = msg({description}, {send})
+    const outgoing = msg({description}, {send, close})
     const [reader, onRead] = frame.reader()
     const [msgs, recv] = port()
     onRead(m => msgs.send(m))
@@ -617,6 +617,7 @@ connections. Each connection is itself a port, produced by
     server.listen(options)
 
     const close = () => m.close()
+    m.grant('close', close)
     server.on('close', close)
     server.on('error', close)
 
@@ -652,6 +653,7 @@ core.
       onConnect([client, recv])
     })
     const close = () => m.close()
+    wss.grant('close', close)
     wss.on('close', close)
     wss.on('error', close)
 
@@ -689,11 +691,13 @@ native =WebSocket=, in Node.js with the =ws= package, and for
     ws.addEventListener('close', close)
     ws.addEventListener('error', close)
 
-    function send(m) {
-      const data = m.data
-      if(data) ws.send(JSON.stringify(data))
-    }
-    outgoing.grant('send', send)
+    outgoing.grantAll({
+      send: m => {
+        const data = m.data
+        if(data) ws.send(JSON.stringify(data))
+      },
+      close: () => outgoing.close()
+    })
     outgoing.ctl.closes(msgs, ws)
 
     return [outgoing, recv]
@@ -721,9 +725,12 @@ clone. Objects cross the boundary without serialization. Works with
 
     outgoing.ctl.closes(msgs, messagePort)
 
-    outgoing.grant('send', msg => {
-      const data = msg.data
-      if(data) messagePort.postMessage(data)
+    outgoing.grantAll({
+      send: m => {
+        const data = m.data
+        if(data) messagePort.postMessage(data)
+      },
+      close: () => outgoing.close()
     })
     return [outgoing, recv]
   }
@@ -753,7 +760,10 @@ produce a port of messages.
     onRead(v => msgs.send(v))
 
     const outgoing = msg({description})
-      .grant('send', m => process.stdout.write(frame.format(m)))
+      .grantAll({
+        send: m => process.stdout.write(frame.format(m)),
+        close: () => outgoing.close()
+      })
 
     outgoing.ctl.closes(msgs, rl, reader)
 

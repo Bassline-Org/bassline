@@ -17,11 +17,13 @@ export function fromWebSocket(ws) {
   ws.addEventListener('close', close)
   ws.addEventListener('error', close)
 
-  function send(m) {
-    const data = m.data
-    if (data) ws.send(JSON.stringify(data))
-  }
-  outgoing.grant('send', send)
+  outgoing.grantAll({
+    send: m => {
+      const data = m.data
+      if (data) ws.send(JSON.stringify(data))
+    },
+    close: () => outgoing.close(),
+  })
   outgoing.ctl.closes(msgs, ws)
 
   return [outgoing, recv]

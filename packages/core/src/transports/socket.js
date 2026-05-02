@@ -8,7 +8,7 @@ I allow interactions with socket-like interfaces.
 Any messages I am sent, is forwarded over the wire as data.`
 
 export function fromSocket(socket, frame = defaultFrame) {
-  const outgoing = msg({ description }, { send })
+  const outgoing = msg({ description }, { send, close })
   const [reader, onRead] = frame.reader()
   const [msgs, recv] = port()
   onRead(m => msgs.send(m))
