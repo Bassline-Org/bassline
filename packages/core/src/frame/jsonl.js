@@ -2,8 +2,8 @@ import { propagator, is, msg } from '../bassline.js'
 
 const description = `\
 I am a reader.
-I read messages into a buffer, parsed as JSONL values.
 I can be sent messages like {scalar: string}.
+I read messages into a buffer, parsed as JSONL values.
 I emit parsed messages.`
 
 const validChunk = m => m.conforms({ scalar: is.string })

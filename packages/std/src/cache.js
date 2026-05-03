@@ -1,4 +1,7 @@
-import { is, invariants, Msg } from '@bassline/core'
+/**
+ * @import {Recv} from "@bassline/core"
+ */
+import { is, invariants, Msg, propagator, consume } from '@bassline/core'
 
 const description = `\
 I am a cache.
@@ -9,14 +12,20 @@ I also perform simple "routing".
 If you send to me with a {via: string} message,
 I will dispatch that to a parked cap (if it exists).`
 
-const committedDescription = ids => `\
-I am a committed message.
+const entryDescription = ids => `\
+I am a cached message.
 I am storing ${ids.length} caps.
 Those caps are: [
 ${ids.map(v => `- ${v}`).join('\n')}
 ]
 `
-
+const convDescription = `\
+I am a conversation.
+I allow for easy sharing of messages & caps.
+Messages sent to me will be cached and shared.
+I will automatically route incoming messages to their caps.
+I only propagate messages that weren't routed to caps.
+`
 export const assertMsg = invariants([[is.msg, 'expected msg']])
 export const isCommit = invariants([
   [is.msg, 'expected msg'],
@@ -27,39 +36,52 @@ export const isCommit = invariants([
 export function createCache() {
   const byMsg = new Map()
   const byId = new Map()
-  const m = new Msg({ description })
-  m.grantAll({
-    send: dispatch,
-    close: m.close,
-  })
-  const commits = () => Array.from(byMsg.values())
-  const closed = () => m.ctl.closed
+  const entries = () => Array.from(byMsg.values())
 
-  m.ctl.onClose(() => {
+  const [cache, onMsg] = propagator((aMsg, fwd) => {
+    const result = dispatch(aMsg)
+    if (result) fwd(result)
+  })
+  cache.merge({ description })
+
+  const closed = () => cache.ctl.closed
+
+  cache.ctl.onClose(() => {
     for (const msg of byMsg.keys()) msg.close()
     byId.clear()
     byMsg.clear()
   })
 
+  /**
+   *
+   * @param {Msg} aMsg
+   * @returns {Msg | undefined}
+   */
   function dispatch(aMsg) {
     const via = aMsg.get('via')
     if (!via) return aMsg
-    const send = byId.get(via)
-    if (!send) return aMsg
-    send(aMsg.copy().delete('via'))
+    const parked = byId.get(via)
+    if (!parked) return aMsg
+    const withoutVia = aMsg.map(m => m.delete('via'))
+    parked(withoutVia)
   }
 
+  /**
+   *
+   * @param {Msg} aMsg
+   * @returns {Msg | undefined}
+   */
   function toData(aMsg) {
     if (closed()) return
     assertMsg(aMsg)
-    let commitment = byMsg.get(aMsg)
-    if (commitment) return commitment
+    let cached = byMsg.get(aMsg)
+    if (cached) return cached
 
     const ids = []
     const capabilities = {}
-    commitment = new Msg()
-    byMsg.set(aMsg, commitment)
-    aMsg.ctl.closes(commitment)
+    cached = new Msg()
+    byMsg.set(aMsg, cached)
+    aMsg.closes(cached)
 
     for (const spelling of aMsg.caps.keys()) {
       const id = crypto.randomUUID()
@@ -68,33 +90,71 @@ export function createCache() {
       capabilities[spelling] = id
     }
 
-    commitment.ctl.onClose(() => {
+    cached.ctl.onClose(() => {
       byMsg.delete(aMsg)
       ids.forEach(id => byId.delete(id))
     })
 
-    commitment.merge({
-      description: committedDescription(ids),
+    cached.merge({
+      description: entryDescription(ids),
       capabilities,
     })
 
-    return commitment
+    return cached
   }
 
-  function fromData(aMsg, delegate = m) {
-    assertMsg(aMsg)
-    assertMsg(delegate)
-    const caps = aMsg.get('capabilities')
-    if (!caps) return aMsg
-    const copy = aMsg.copy()
-    aMsg.ctl.closes(copy)
+  const locals = { onMsg, dispatch, toData, entries }
+  return [cache, locals]
+}
+
+/**
+ *
+ * @param {Msg} aMsg
+ * @param {Msg} delegate
+ * @returns {Msg}
+ */
+export function bindRawCaps(aMsg, delegate) {
+  assertMsg(aMsg)
+  assertMsg(delegate)
+  const caps = aMsg.get('capabilities')
+  if (!caps) return aMsg
+  return aMsg.map(copy => {
+    aMsg.closes(copy)
+    delegate.closes(copy)
     copy.delete('capabilities')
     for (const [spelling, id] of Object.entries(caps)) {
-      copy.grant(spelling, m => delegate.send(m.copy({ via: id })))
+      copy.grant(spelling, msg => delegate.send(msg.copy({ via: id })))
     }
     return copy
-  }
+  })
+}
 
-  const locals = { dispatch, fromData, toData, commits }
-  return [m, locals]
+export function conversation(delegate, { recv, toData, dispatch }) {
+  const [msgs, { to: onMsg }] = consume(recv, (aMsg, send) => {
+    const r = bindRawCaps(aMsg, delegate).do(dispatch)
+    if (r) send(r)
+  })
+  const conv = new Msg({ description: convDescription })
+  conv.grantAll({
+    send: aMsg => {
+      const raw = toData(aMsg)
+      delegate.closes(raw)
+      delegate.send(raw)
+    },
+    close: conv.close,
+  })
+  conv.closes(msgs)
+  return [conv, onMsg]
+}
+
+/**
+ *
+ * @param {[Msg, Recv]} portLike
+ */
+export function dialogue([delegate, recv]) {
+  const [cache, { toData, dispatch }] = createCache()
+  const [conv, onMsg] = conversation(delegate, { recv, toData, dispatch })
+  conv.closes(cache, delegate)
+  delegate.closes(conv)
+  return [conv, onMsg]
 }

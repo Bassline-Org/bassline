@@ -8,10 +8,8 @@ export type Send<T = Msg> = (arg: T) => void
 export type Recv<T = Msg> = () => Promise<T | typeof EOF>
 export type Close = (reason?: string) => void
 
-
-
 export interface CacheLike {
-  storeCap(msg: Msg<any, any>, spelling: string, send: Send<any>): unknown
+  storeCap(msg: Msg<unknown, unknown>, spelling: string, send: Send<unknown>): unknown
 }
 
 export interface Ctl {
@@ -33,20 +31,17 @@ export class Msg<D extends Data = {}, C extends Caps = {}> {
 
   constructor(data?: D, caps?: C)
 
+  onClose: Ctl['onClose']
+  closes: Ctl['closes']
+
   /**
    * Make a copy with optional data overlay.
    * The copy gets its own ctl but shares the same cap closures.
    * Closing one doesn't affect the other.
    */
   copy<T extends Data>(data?: T): Msg<D & T, C>
-
-  /**
-   * Lower a Msg to data, parking the caps into a cache (ie when sending over the wire).
-   * When this Msg is closed, the caps are revoked from the store.
-   * When a message is lifted from data, they reference the caps, but don't own them.
-   */
-  store(cache: CacheLike): void
-
+  map<T>(fn: (aMsg: this) => T): T
+  do<T>(fn: (aMsg: this) => T): T
   merge<T extends Data>(data: T): Msg<D & T, C>
 
   get<K extends keyof D>(key: K): D[K]
@@ -66,7 +61,7 @@ export class Msg<D extends Data = {}, C extends Caps = {}> {
   revoke<K extends keyof C & string>(spelling: K): Msg<D, Omit<C, K>>
   revoke(spelling: string): this
 
-  grant<K extends string, F extends Send<any>>(
+  grant<K extends string, F extends Send>(
     spelling: K,
     fn: F
   ): Msg<D, C & { [k in K]: F }>
@@ -93,24 +88,23 @@ export function msg<D extends Data, C extends Caps>(
   caps?: C
 ): Msg<D, C>
 
-export function port<T = any>(
+export function port<T = unknown>(
   size?: number
 ): readonly [
   Msg<{ description: string }, { send: Send<T>; close: Close }>,
   Recv<T>
 ]
 
-export type PropagateFn<In = Msg, Out = In> = (
-  value: In,
-  propagate: (value: Out) => void
-) => void | Promise<void>
+export type PropagateFn<In = Msg, Out = In> =
+| ((value: In, propagate: Send<Out>) => void | Promise<void>)
+| ((value: In) => void | Promise<void>)
 
 export function propagator<T = Msg>(): readonly [
   Msg<{ description: string }, { send: Send<T>; close: Close }>,
   (...dests: Send<T>[]) => () => void
 ]
 
-export function propagator<In = any, Out = In>(
+export function propagator<In = unknown, Out = In>(
   fn: PropagateFn<In, Out>
 ): readonly [
   Msg<{ description: string }, { send: Send<In>; close: Close }>,

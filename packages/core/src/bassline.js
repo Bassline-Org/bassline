@@ -122,18 +122,21 @@ export class Msg {
     })
   }
 
+  closes(...targets) {
+    this.ctl.closes(...targets)
+    return this
+  }
+
+  onClose(fn) {
+    return this.ctl.onClose(fn)
+  }
+
   copy(data = {}) {
     const msg = new Msg({ ...this.data, ...data })
     for (const [k, v] of this.caps) {
       msg.grant(k, v)
     }
     return msg
-  }
-
-  store(cache) {
-    for (const [spelling, fn] of this.caps) {
-      cache.storeCap(this, spelling, fn)
-    }
   }
 
   merge(data) {
@@ -192,6 +195,14 @@ export class Msg {
 
   send(msg) {
     return this.invoke('send', msg)
+  }
+
+  do(fn) {
+    return fn(this)
+  }
+
+  map(fn) {
+    return fn(this.copy())
   }
 
   conforms(description) {
@@ -294,7 +305,7 @@ export function net() {
   const netm = new Msg({ description })
 
   netm.grantAll({
-    send: msg => ports.forEach(p => p.invoke('send', msg)),
+    send: msg => ports.forEach(p => p.send(msg)),
     close: netm.close,
   })
 

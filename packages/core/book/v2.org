@@ -125,6 +125,15 @@ closed protocol up front.
       })
     }
 
+    closes(...targets) {
+      this.ctl.closes(...targets)
+      return this
+    }
+
+    onClose(fn) {
+      return this.ctl.onClose(fn)
+    }
+
     copy(data = {}) {
       const msg = new Msg({ ...this.data, ...data })
       for (const [k, v] of this.caps) {
@@ -189,6 +198,14 @@ closed protocol up front.
 
     send(msg) {
       return this.invoke('send', msg)
+    }
+
+    do(fn) {
+      return fn(this)
+    }
+
+    map(fn) {
+      return fn(this.copy())
     }
 
     conforms(description) {
