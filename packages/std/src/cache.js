@@ -1,118 +1,100 @@
-import { is, Msg, failure } from '@bassline/core'
+import { is, invariants, Msg } from '@bassline/core'
 
-export class Cache {
-  byMsg = new Map()
-  byId = new Map()
+const description = `\
+I am a cache.
+I allow messages with capabilities to be shared across process boundaries.
+Later binding raw messages to invoke those caps.
 
-  clear() {
-    for (const msg of this.byMsg.keys()) {
-      msg.close()
+I also perform simple "routing".
+If you send to me with a {via: string} message,
+I will dispatch that to a parked cap (if it exists).`
+
+const committedDescription = ids => `\
+I am a committed message.
+I am storing ${ids.length} caps.
+Those caps are: [
+${ids.map(v => `- ${v}`).join('\n')}
+]
+`
+
+export const assertMsg = invariants([[is.msg, 'expected msg']])
+export const isCommit = invariants([
+  [is.msg, 'expected msg'],
+  [m => m.caps.size === 0, 'has caps, not a commit'],
+  [m => m.has('capabilities'), 'no capability data'],
+])
+
+export function createCache() {
+  const byMsg = new Map()
+  const byId = new Map()
+  const m = new Msg({ description })
+  m.grantAll({
+    send: dispatch,
+    close: m.close,
+  })
+  const commits = () => Array.from(byMsg.values())
+  const closed = () => m.ctl.closed
+
+  m.ctl.onClose(() => {
+    for (const msg of byMsg.keys()) msg.close()
+    byId.clear()
+    byMsg.clear()
+  })
+
+  function dispatch(aMsg) {
+    const via = aMsg.get('via')
+    if (!via) return aMsg
+    const send = byId.get(via)
+    if (!send) return aMsg
+    send(aMsg.copy().delete('via'))
+  }
+
+  function toData(aMsg) {
+    if (closed()) return
+    assertMsg(aMsg)
+    let commitment = byMsg.get(aMsg)
+    if (commitment) return commitment
+
+    const ids = []
+    const capabilities = {}
+    commitment = new Msg()
+    byMsg.set(aMsg, commitment)
+    aMsg.ctl.closes(commitment)
+
+    for (const spelling of aMsg.caps.keys()) {
+      const id = crypto.randomUUID()
+      ids.push(id)
+      byId.set(id, m => aMsg.invoke(spelling, m))
+      capabilities[spelling] = id
     }
-    this.byId.clear()
-    this.byMsg.clear()
-  }
 
-  toRaw(msg) {
-    if (!is.msg(msg)) throw failure('expected Msg')
-    if (!this.byMsg.has(msg)) {
-      this.store(msg)
-    }
-    const data = { ...msg.data }
-    const entries = this.entriesFor(msg)
-
-    if (entries.size === 0) return data
-    const caps = {}
-    for (const { spelling, id } of entries) {
-      caps[spelling] = id
-    }
-    data.capabilities = caps
-    return data
-  }
-
-  /*
-   * takes a raw message and attaches capabilities
-   * It's important to note that the referenced capability from the data
-   * message is late bound and the underlying implementation isn't
-   * "owned" by that message. Instead the message owns a closure
-   * that dispatches via the cache.
-   */
-  fromRaw(rawData, delegate = null) {
-    const { capabilities, ...raw } = rawData
-    const caps = {}
-    if (capabilities) {
-      for (const [spelling, id] of Object.entries(capabilities)) {
-        caps[spelling] = msg => {
-          const m = msg.copy({ via: id })
-          if (delegate) delegate(m)
-          else this.dispatchVia(m)
-        }
-      }
-    }
-    const m = new Msg(raw, caps)
-    this.store(m)
-    return m
-  }
-
-  sendRaw(msg, send) {
-    send(this.toRaw(msg))
-    return this
-  }
-
-  dispatchVia(msg) {
-    const { via } = msg.data
-    if (!via) return this
-    const send = this.sendFor(via)
-    if (!send) return this
-    const m = msg.copy().delete('via')
-    send(m)
-  }
-
-  sendFor(id) {
-    const entry = this.byId.get(id)
-    if (entry) return entry.send
-  }
-
-  storeFor(value) {
-    if (is.msg(value)) return this.byMsg
-    if (is.string(value)) return this.byId
-    throw failure('invalid storeFor')
-  }
-
-  entriesFor(msg) {
-    if (!is.msg(msg)) throw failure('expected Msg')
-    let entries = this.byMsg.get(msg)
-    if (entries) return entries
-    if (!entries && msg.ctl.closed) return
-    entries = new Set()
-    this.byMsg.set(msg, entries)
-    msg.ctl.onClose(() => {
-      const entries = this.entriesFor(msg)
-      if (!entries) return
-      for (const entry of entries) {
-        this.byId.delete(entry.id)
-        entries.delete(entry)
-      }
-      this.byMsg.delete(msg)
+    commitment.ctl.onClose(() => {
+      byMsg.delete(aMsg)
+      ids.forEach(id => byId.delete(id))
     })
-    return entries
+
+    commitment.merge({
+      description: committedDescription(ids),
+      capabilities,
+    })
+
+    return commitment
   }
 
-  storeCap(msg, spelling, send) {
-    if (!is.msg(msg)) throw failure('msg must be a Msg!')
-    const entries = this.entriesFor(msg)
-    if (!entries) return
-    for (const e of entries) {
-      if (e.send === send && e.spelling === spelling) return e
+  function fromData(aMsg, delegate = m) {
+    assertMsg(aMsg)
+    assertMsg(delegate)
+    const caps = aMsg.get('capabilities')
+    if (!caps) return aMsg
+    const copy = aMsg.copy()
+    aMsg.ctl.closes(copy)
+    copy.delete('capabilities')
+    for (const [spelling, id] of Object.entries(caps)) {
+      copy.grant(spelling, m => delegate.send(m.copy({ via: id })))
     }
-    const id = crypto.randomUUID()
-    const entry = { id, send, msg, spelling }
-    entries.add(entry)
-    this.byId.set(entry.id, entry)
-    return entry
+    return copy
   }
 
-  store(msg) {
-    if (!is.msg(msg)) throw failure('expected Msg')
-    msg.store(this)
-  }
+  const locals = { dispatch, fromData, toData, commits }
+  return [m, locals]
 }

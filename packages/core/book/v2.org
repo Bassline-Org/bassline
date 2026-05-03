@@ -45,6 +45,162 @@ For each part of the kernel, we will separate the abstract idea from
 the concrete implementation used in this book.  The abstract layer
 explains what shape of thing we are modeling.  The concrete layer
 shows one minimal JavaScript realization of that shape.
+** Messages
+*** Abstractly
+
+A message is a fragment of partial information. It is whatever can be
+locally held, passed around, inspected, and combined without requiring
+a complete picture of the world.
+
+A message does not come with privileged meaning beyond what
+participants give it.  If provenance, correlation, naming,
+coordination hints, or other structure matters, it lives in the
+message like any other data.  Bassline does not want a separate
+metadata plane that is somehow more real than the information being
+exchanged.
+
+*Note: The following is a bit of new prose for messages i'm testing*
+
+Messages are data, not "code". They are inert unless interpreted and
+acted upon.  Interpreting a message is the local act of "binding" the
+meaning of message to some local program execution.
+
+As such it doesn't violate our model of messaging & communication, if
+there exists purely local capabilities bound by other local
+participants, traveling ALONGSIDE the data.
+
+This is equivalent to ports, we don't care who added these
+capabilities, but we can observe them and act on them locally.
+
+This isn't possible in all systems, but it's a useful pattern none the less.
+
+The constraints to make this "work" are:
+- capabilities must be allowed to be ignored
+- capabilities must never return values directly, they should be
+  opaque
+- capabilities shouldn't removed data from the message itself, they
+  should only enrich it for those interested
+- capabilities cannot travel over the wire, unless they are reified as
+  a higher order message.
+
+*** Concretely
+
+TODO: Update prose
+A message is a plain object with string keys. It can be empty,
+partially filled, or nested inside other messages.
+
+The concrete representation is intentionally minimal. Plain objects
+are open-ended, nest naturally, and are easy to serialize, enrich, and
+inspect. That keeps the message lightweight and avoids forcing a
+closed protocol up front.
+
+#+NAME: message-impl
+#+BEGIN_SRC js
+  const validCapName = invariants([[is.string, 'cap spelling must be a string']])
+  const validCapFn = invariants([[is.fn, 'cap fn must be a function']])
+  const validCaps = invariants([
+    [v => Object.keys(v).every(is.string), 'cap keys must be strings'],
+    [v => Object.values(v).every(is.fn), 'cap values must be functions']
+  ])
+
+  const validData = invariants([
+    [is.object, 'data must be an object'],
+    [v => !is.array(v), 'data cannot be an array']
+  ])
+
+  export class Msg {
+    data = {}
+    caps = new Map()
+
+    constructor(data = {}, caps = {}) {
+      validData(data)
+      validCaps(caps)
+      const { ctl, close } = createController()
+      this.ctl = ctl
+      this.close = close
+      this.merge(data)
+      this.grantAll(caps)
+      this.ctl.onClose(() => {
+        this.caps.clear()
+      })
+    }
+
+    copy(data = {}) {
+      const msg = new Msg({ ...this.data, ...data })
+      for (const [k, v] of this.caps) {
+        msg.grant(k, v)
+      }
+      return msg
+    }
+
+    merge(data) {
+      this.data = { ...this.data, ...data }
+      return this
+    }
+
+    has(key) {
+      return key in this.data
+    }
+
+    hasKeys(keys) {
+      return keys.every(k => this.has(k))
+    }
+
+    get(key) {
+      return this.data[key]
+    }
+
+    delete(key) {
+      delete this.data[key]
+      return this
+    }
+
+    hasCap(key) {
+      return this.caps.has(key)
+    }
+
+    hasCaps(keys) {
+      return keys.every(k => this.hasCap(k))
+    }
+
+    revoke(spelling) {
+      this.caps.delete(spelling)
+      return this
+    }
+
+    grant(spelling, fn) {
+      validCapName(spelling)
+      validCapFn(fn)
+      this.caps.set(spelling, fn)
+      return this
+    }
+
+    grantAll(obj) {
+      Object.entries(obj).forEach(([k, v]) => this.grant(k, v))
+      return this
+    }
+
+    invoke(spelling, arg = new Msg()) {
+      validCapName(spelling)
+      const cap = this.caps.get(spelling)
+      if (cap) cap(arg)
+      return this
+    }
+
+    send(msg) {
+      return this.invoke('send', msg)
+    }
+
+    conforms(description) {
+      return conforms(description)(this.data)
+    }
+  }
+
+  export function msg(data = {}, caps = {}) {
+    if (is.msg(data)) return data.grantAll(caps)
+    return new Msg(data, caps)
+  }
+#+END_SRC
 
 ** Communication
 :PROPERTIES:
@@ -170,6 +326,9 @@ interesting messages to multiple targets.
 Cycles are supported and encouraged, just make sure you correctly
 setup your propagators to ignore irrelevant information.
 
+*NOTE: We might want to make =to= instead take messages rather than
+functions, it's probably cleaner since we can do lifecycle stuff.*
+
 #+begin_src js
   export function propagator(fn = (v, p) => p(v)) {
     const description = 'I am a propagator. I am a reactive inference machine.'
@@ -195,7 +354,7 @@ setup your propagators to ignore irrelevant information.
   }
 #+end_src
 
-***** Cell
+**** Cell
 
 A propagator with state
 
@@ -266,7 +425,7 @@ single participant, even if they are totally unaware of each other.
     const netm = new Msg({description})
 
     netm.grantAll({
-      send: msg => ports.forEach(p => p.invoke('send', msg)),
+      send: msg => ports.forEach(p => p.send(msg)),
       close: netm.close
     })
 
@@ -289,169 +448,6 @@ single participant, even if they are totally unaware of each other.
     return [netm, join]
   }
 #+end_src
-
-** Messages
-*** Abstractly
-
-A message is a fragment of partial information. It is whatever can be
-locally held, passed around, inspected, and combined without requiring
-a complete picture of the world.
-
-A message does not come with privileged meaning beyond what
-participants give it.  If provenance, correlation, naming,
-coordination hints, or other structure matters, it lives in the
-message like any other data.  Bassline does not want a separate
-metadata plane that is somehow more real than the information being
-exchanged.
-
-*Note: The following is a bit of new prose for messages i'm testing*
-
-Messages are data, not "code". They are inert unless interpreted and
-acted upon.  Interpreting a message is the local act of "binding" the
-meaning of message to some local program execution.
-
-As such it doesn't violate our model of messaging & communication, if
-there exists purely local capabilities bound by other local
-participants, traveling ALONGSIDE the data.
-
-This is equivalent to ports, we don't care who added these
-capabilities, but we can observe them and act on them locally.
-
-This isn't possible in all systems, but it's a useful pattern none the less.
-
-The constraints to make this "work" are:
-- capabilities must be allowed to be ignored
-- capabilities must never return values directly, they should be
-  opaque
-- capabilities shouldn't removed data from the message itself, they
-  should only enrich it for those interested
-- capabilities cannot travel over the wire, unless they are reified as
-  a higher order message.
-
-*** Concretely
-
-TODO: Update prose
-A message is a plain object with string keys. It can be empty,
-partially filled, or nested inside other messages.
-
-The concrete representation is intentionally minimal. Plain objects
-are open-ended, nest naturally, and are easy to serialize, enrich, and
-inspect. That keeps the message lightweight and avoids forcing a
-closed protocol up front.
-
-#+NAME: message-impl
-#+BEGIN_SRC js
-  const validCapName = invariants([[is.string, 'cap spelling must be a string']])
-  const validCapFn = invariants([[is.fn, 'cap fn must be a function']])
-  const validCaps = invariants([
-    [v => Object.keys(v).every(is.string), 'cap keys must be strings'],
-    [v => Object.values(v).every(is.fn), 'cap values must be functions']
-  ])
-
-  const validData = invariants([
-    [is.object, 'data must be an object'],
-    [v => !is.array(v), 'data cannot be an array']
-  ])
-
-  export class Msg {
-    data = {}
-    caps = new Map()
-
-    constructor(data = {}, caps = {}) {
-      validData(data)
-      validCaps(caps)
-      const { ctl, close } = createController()
-      this.ctl = ctl
-      this.close = close
-      this.merge(data)
-      this.grantAll(caps)
-      this.ctl.onClose(() => {
-        this.caps.clear()
-      })
-    }
-
-    copy(data = {}) {
-      const msg = new Msg({ ...this.data, ...data })
-      for (const [k, v] of this.caps) {
-        msg.grant(k, v)
-      }
-      return msg
-    }
-
-    store(cache) {
-      for (const [spelling, fn] of this.caps) {
-        cache.storeCap(this, spelling, fn)
-      }
-    }
-
-    merge(data) {
-      this.data = { ...this.data, ...data }
-      return this
-    }
-
-    has(key) {
-      return key in this.data
-    }
-
-    hasKeys(keys) {
-      return keys.every(k => this.has(k))
-    }
-
-    get(key) {
-      return this.data[key]
-    }
-
-    delete(key) {
-      delete this.data[key]
-      return this
-    }
-
-    hasCap(key) {
-      return this.caps.has(key)
-    }
-
-    hasCaps(keys) {
-      return keys.every(k => this.hasCap(k))
-    }
-
-    revoke(spelling) {
-      this.caps.delete(spelling)
-      return this
-    }
-
-    grant(spelling, fn) {
-      validCapName(spelling)
-      validCapFn(fn)
-      this.caps.set(spelling, fn)
-      return this
-    }
-
-    grantAll(obj) {
-      Object.entries(obj).forEach(([k, v]) => this.grant(k, v))
-      return this
-    }
-
-    invoke(spelling, arg = new Msg()) {
-      validCapName(spelling)
-      const cap = this.caps.get(spelling)
-      if (cap) cap(arg)
-      return this
-    }
-
-    send(msg) {
-      return this.invoke('send', msg)
-    }
-
-    conforms(description) {
-      return conforms(description)(this.data)
-    }
-  }
-
-  export function msg(data = {}, caps = {}) {
-    if (is.msg(data)) return data.grantAll(caps)
-    return new Msg(data, caps)
-  }
-#+END_SRC
 
 * Transports
 As above, it helps to separate the abstract role of a transport from
@@ -498,8 +494,8 @@ is used on the outgoing side to serialize before writing.
 
   const description = `\
   I am a reader.
-  I read messages into a buffer, parsed as JSONL values.
   I can be sent messages like {scalar: string}.
+  I read messages into a buffer, parsed as JSONL values.
   I emit parsed messages.`
 
   const validChunk = m => m.conforms({scalar: is.string})
