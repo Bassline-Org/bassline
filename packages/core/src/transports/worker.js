@@ -7,14 +7,14 @@ export function fromPort(messagePort) {
   messagePort.onmessage = e => msgs.send(msg(e.data))
   messagePort.onmessageerror = () => outgoing.close()
 
-  outgoing.ctl.closes(msgs, messagePort)
+  outgoing.closes(msgs, messagePort)
 
   outgoing.grantAll({
     send: m => {
       const data = m.data
       if (data) messagePort.postMessage(data)
     },
-    close: () => outgoing.close(),
+    close: outgoing.close,
   })
   return [outgoing, recv]
 }

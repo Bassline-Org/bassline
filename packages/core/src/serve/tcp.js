@@ -12,17 +12,16 @@ export function serve(onConnect, options = {}, frame = defaultFrame) {
 
   const server = nodeNet.createServer(socket => {
     const [client, recv] = fromSocket(socket, frame)
-    m.ctl.closes(client)
+    m.closes(client)
     onConnect([client, recv])
   })
 
-  m.ctl.closes(server)
+  m.closes(server)
   server.listen(options)
 
-  const close = () => m.close()
-  m.grant('close', close)
-  server.on('close', close)
-  server.on('error', close)
+  m.grant('close', m.close)
+  server.on('close', m.close)
+  server.on('error', m.close)
 
   return [m, server]
 }

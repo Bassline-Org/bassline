@@ -14,10 +14,10 @@ export function fromStdio(frame = defaultFrame) {
 
   const outgoing = msg({ description }).grantAll({
     send: m => process.stdout.write(frame.format(m)),
-    close: () => outgoing.close(),
+    close: outgoing.close,
   })
 
-  outgoing.ctl.closes(msgs, rl, reader)
+  outgoing.closes(msgs, rl, reader)
 
   rl.on('line', line => reader.send(msg({ scalar: line + '\n' })))
   rl.on('close', () => outgoing.close())

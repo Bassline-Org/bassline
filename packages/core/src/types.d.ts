@@ -118,8 +118,8 @@ export type Merge<In, State> = (
 ) => void
 
 export function cell<In = Msg, State = In>(
-  merge?: Merge<In, State>,
-  init?: State
+  merge: Merge<In, State>,
+  init: State
 ): readonly [
   Msg<{ description: string }, { send: Send<In>; close: Close }>,
   {

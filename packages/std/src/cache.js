@@ -138,7 +138,6 @@ export function conversation(delegate, { recv, toData, dispatch }) {
   conv.grantAll({
     send: aMsg => {
       const raw = toData(aMsg)
-      delegate.closes(raw)
       delegate.send(raw)
     },
     close: conv.close,

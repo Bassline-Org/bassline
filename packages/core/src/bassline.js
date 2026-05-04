@@ -99,27 +99,41 @@ const validCaps = invariants([
   [v => Object.keys(v).every(is.string), 'cap keys must be strings'],
   [v => Object.values(v).every(is.fn), 'cap values must be functions'],
 ])
-
 const validData = invariants([
   [is.object, 'data must be an object'],
+  [v => Object.keys(v).every(is.string)],
   [v => !is.array(v), 'data cannot be an array'],
 ])
+
+export function msg(data = {}, caps = {}) {
+  if (is.msg(data)) return data.copy().grantAll(caps)
+  return new Msg(data, caps)
+}
 
 export class Msg {
   data = {}
   caps = new Map()
+  #controller = createController()
 
   constructor(data = {}, caps = {}) {
     validData(data)
     validCaps(caps)
-    const { ctl, close } = createController()
-    this.ctl = ctl
-    this.close = close
     this.merge(data)
-    this.grantAll(caps)
-    this.ctl.onClose(() => {
-      this.caps.clear()
-    })
+      .grantAll(caps)
+      .onClose(() => this.caps.clear())
+  }
+
+  // lifecycle
+  get ctl() {
+    return this.#controller.ctl
+  }
+
+  get close() {
+    return this.#controller.close
+  }
+
+  get closed() {
+    return this.ctl.closed
   }
 
   closes(...targets) {
@@ -128,15 +142,25 @@ export class Msg {
   }
 
   onClose(fn) {
-    return this.ctl.onClose(fn)
+    this.ctl.onClose(fn)
+    return this
   }
 
-  copy(data = {}) {
-    const msg = new Msg({ ...this.data, ...data })
-    for (const [k, v] of this.caps) {
-      msg.grant(k, v)
+  // data access
+  get(key) {
+    if (is.array(key)) {
+      return key.map(k => this.get(k))
     }
-    return msg
+    return this.data[key]
+  }
+
+  delete(key) {
+    if (is.array(key)) {
+      key.forEach(k => this.delete(k))
+      return this
+    }
+    delete this.data[key]
+    return this
   }
 
   merge(data) {
@@ -145,31 +169,29 @@ export class Msg {
   }
 
   has(key) {
+    if (is.array(key)) {
+      return key.every(k => this.has(k))
+    }
     return key in this.data
   }
 
-  hasKeys(keys) {
-    return keys.every(k => this.has(k))
+  get keys() {
+    return Object.keys(this.data)
   }
 
-  get(key) {
-    return this.data[key]
-  }
-
-  delete(key) {
-    delete this.data[key]
-    return this
-  }
-
+  // cap access
   hasCap(key) {
+    if (is.array(key)) {
+      return key.every(k => this.hasCap(k))
+    }
     return this.caps.has(key)
   }
 
-  hasCaps(keys) {
-    return keys.every(k => this.hasCap(k))
-  }
-
   revoke(spelling) {
+    if (is.array(spelling)) {
+      spelling.forEach(s => this.revoke(s))
+      return this
+    }
     this.caps.delete(spelling)
     return this
   }
@@ -186,6 +208,11 @@ export class Msg {
     return this
   }
 
+  get capKeys() {
+    return Array.from(this.caps.keys())
+  }
+
+  // cap invocation
   invoke(spelling, arg = new Msg()) {
     validCapName(spelling)
     const cap = this.caps.get(spelling)
@@ -197,6 +224,15 @@ export class Msg {
     return this.invoke('send', msg)
   }
 
+  // manipulation
+  copy(data = {}) {
+    const msg = new Msg({ ...this.data, ...data })
+    for (const [k, v] of this.caps) {
+      msg.grant(k, v)
+    }
+    return msg
+  }
+
   do(fn) {
     return fn(this)
   }
@@ -205,14 +241,10 @@ export class Msg {
     return fn(this.copy())
   }
 
+  // predicate testing
   conforms(description) {
     return conforms(description)(this.data)
   }
-}
-
-export function msg(data = {}, caps = {}) {
-  if (is.msg(data)) return data.grantAll(caps)
-  return new Msg(data, caps)
 }
 export function port(size = Infinity) {
   const buffer = [],
@@ -221,7 +253,7 @@ export function port(size = Infinity) {
   const m = new Msg({ description })
   m.grantAll({
     send: msg => {
-      if (is.eof(msg)) throw new Error('Bassline EOF is reserved')
+      if (is.eof(msg)) throw failure('Bassline EOF is reserved')
       // resolve the promise if we have a waiter
       if (waiters.length > 0) return waiters.shift()(msg)
       // drop a message if we are over capabity
@@ -231,13 +263,13 @@ export function port(size = Infinity) {
     },
     close: m.close,
   })
-  m.ctl.onClose(() => {
+  m.onClose(() => {
     for (const w of waiters) w(EOF)
     waiters.length = 0
   })
   function recv() {
     if (buffer.length > 0) return Promise.resolve(buffer.shift())
-    if (m.ctl.closed) return Promise.resolve(EOF)
+    if (m.closed) return Promise.resolve(EOF)
     return new Promise(resolve => waiters.push(resolve))
   }
   return [m, recv]
@@ -248,7 +280,7 @@ export function propagator(fn = (v, p) => p(v)) {
   const m = new Msg({ description })
   const targets = new Set()
   const propagate = value => targets.forEach(t => t(value))
-  m.ctl.onClose(() => targets.clear())
+  m.onClose(() => targets.clear())
 
   const to = (...dests) => {
     dests.forEach(d => targets.add(d))
@@ -281,26 +313,30 @@ export function cell(merge, init) {
 }
 
 export function consume(recv, callback) {
-  const [m, to] = propagator(callback)
-  const description =
-    'I am a consumed port. I am a propagator driven by a port.'
-  m.merge({ description })
+  const description = `\
+I am a consumed port.
+Internally I am a propagator driven by a port's recv.`
+
+  const [prop, to] = propagator(callback)
+  prop.merge({ description })
+
   const promise = (async () => {
-    const closed = new Promise(resolve => m.ctl.onClose(() => resolve(EOF)))
-    while (!m.ctl.closed) {
+    const closed = new Promise(resolve => prop.onClose(() => resolve(EOF)))
+    while (!prop.closed) {
       const msg = await Promise.race([recv(), closed])
       if (is.eof(msg)) break
-      m.invoke('send', msg)
+      prop.invoke('send', msg)
     }
-    m.invoke('close')
-    m.close()
+    prop.close()
   })()
-  return [m, { to, promise }]
+
+  return [prop, { to, promise }]
 }
 
 export function net() {
-  const description =
-    'I am a net. I implement seamless multi-party communication.'
+  const description = `\
+I am a net.
+I implement seamless multi-party communication.`
   const ports = new Set()
   const netm = new Msg({ description })
 
@@ -317,11 +353,14 @@ export function net() {
         p.send(msg)
       }
     })
+
+    netm.closes(fromNet, toNet)
+    fromNet.closes(toNet)
+    toNet.closes(fromNet)
+
     ports.add(fromNet)
-    netm.ctl.closes(fromNet)
-    fromNet.ctl.closes(toNet)
-    toNet.ctl.closes(fromNet)
-    fromNet.ctl.onClose(() => ports.delete(fromNet))
+    fromNet.onClose(() => ports.delete(fromNet))
+
     return [toNet, recv]
   }
 

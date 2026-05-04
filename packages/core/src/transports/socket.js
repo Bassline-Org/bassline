@@ -5,7 +5,8 @@ import defaultFrame from '../frame/jsonl.js'
 const description = `\
 I am a socket.
 I allow interactions with socket-like interfaces.
-Any messages I am sent, is forwarded over the wire as data.`
+Any messages I am sent, is forwarded over the wire as data,
+stripping it's caps.`
 
 export function fromSocket(socket, frame = defaultFrame) {
   const outgoing = msg({ description }, { send, close })

@@ -29,12 +29,6 @@ export function reader() {
   return [m, to]
 }
 
-export const format = aMsg => {
-  let data = aMsg
-  if (is.msg(aMsg)) {
-    data = aMsg.data
-  }
-  return JSON.stringify(data) + '\n'
-}
+export const format = aMsg => JSON.stringify(aMsg.data) + '\n'
 
 export default { reader, format }

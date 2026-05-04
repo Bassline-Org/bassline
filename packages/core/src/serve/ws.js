@@ -8,16 +8,15 @@ but over web sockets. Go figure!`
 
 export function serve(wss, onConnect) {
   const m = msg({ description })
-  m.ctl.closes(wss)
+  m.closes(wss)
   wss.on('connection', ws => {
     const [client, recv] = fromWebSocket(ws)
-    m.ctl.closes(client)
+    m.closes(client)
     onConnect([client, recv])
   })
-  const close = () => m.close()
-  m.grant('close', close)
-  wss.on('close', close)
-  wss.on('error', close)
+  m.grant('close', m.close)
+  wss.on('close', m.close)
+  wss.on('error', m.close)
 
   return [m, wss]
 }

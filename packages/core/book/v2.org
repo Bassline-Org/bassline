@@ -1,5 +1,5 @@
 #+title: Bassline V2.5
-#+subtitle: Completely Partial Programming
+#+subtitle: I have no send but I must scream
 #+author: Goose
 #+property: header-args:js  :mkdirp yes :noweb yes
 #+property: header-args:js+ :results output
@@ -9,9 +9,65 @@
 * Introduction
 This literate document contains the source code for the core of [[https://bassline.dev][Bassline]] v2.
 
-It is designed to be hacked on and modified, so we encourage people to read this!
+It is designed to be hacked on and modified, so we encourage people to
+read this!
 
 ** TLDR
+
+Bassline is built to make distributed programming dramatically simpler,
+easier, and more flexible.
+
+Specifically we, at Bassline, are most interested in how this
+simplifies decentralized distributed programming. An area that outside
+of blockchains or very specific protocols is relatively
+starved.
+
+Bassline offers a programming / epistemic model that allows arbitrary
+programs & devices to collaborate and interact in an insanely small
+package. It demands almost nothing from participants, is trivial to
+support, and thrives in truly hetergenous settings.
+
+This is enabled not by something we built, specifically it's what we omit.
+
+** The Boogeyman
+
+Distributed programming has the same reputation as a boogeyman. It's
+something that you check for under your bed at night. And it's
+decentralized cousin is described similarly to the devil or an eldritch
+horror.
+
+The church of k8s and the related devops sects preach the dangers of
+this "beast". They offer salvation through system images,
+microservices, monoliths, and more specifications. Yet none of these
+fully solve the problem.
+
+We don't believe distributed programming is a boogeyman, it's just
+misunderstood. More like a particularly moody cat or an alligator.
+
+In local programming we commonly build programs in terms of "things"
+and what they mean. It is an act of building a local ontology to
+express the program we want.
+
+We believe that the uncontrolled proliferation of this idea (we refer
+to this as non-local ontology) is EXTREMELY harmful in distributed
+settings. The root problem is that, in a distributed setting, there
+are literally no "things". A distributed program is just a program
+running on a single machine that talks with the outside world via
+local affordances. There is no "message broker", there is locally
+received messages that I locally assign to be coming from a message broker.
+
+Bassline doesn't fight this, in fact we lean into it fully. We
+acknowledge that outside of our local programs, we literally can't
+know anything. There is an extreme asymetry of information between
+"what I know currently" and "literally everything else".
+
+So rather than build from "things", we build from communcation, with
+the commitment being we do not provide tools that that aren't also
+available in the most hardcore p2p setting you can image. The result
+is a system that is decentralized & distributed by construction, yet
+totally ontologically sovereign.
+
+** Old TLDR
 
 Bassline is a built for partial information programming.
 
@@ -35,11 +91,9 @@ and behavior do not require a separate extensibility system, they
 arrive as more messages to interpret.
 
 * The Kernel
-The kernel starts with messages and a local capability for
-communication.  In this book that capability is implemented with
-ports, a minimal set of capabilities for communication.  Keep in mind
-the important thing is the ability to exchange and observe
-information, not any particular interface shape.
+The kernel starts with messages and local capabilities for
+communication. Keep in mind the important thing is the ability to
+exchange and observe information, not any particular interface shape.
 
 For each part of the kernel, we will separate the abstract idea from
 the concrete implementation used in this book.  The abstract layer
@@ -48,51 +102,99 @@ shows one minimal JavaScript realization of that shape.
 ** Messages
 *** Abstractly
 
-A message is a fragment of partial information. It is whatever can be
-locally held, passed around, inspected, and combined without requiring
-a complete picture of the world.
+Messages are the most important concept in Bassline. So let's take a
+moment to define what a message really is.
 
-A message does not come with privileged meaning beyond what
-participants give it.  If provenance, correlation, naming,
-coordination hints, or other structure matters, it lives in the
-message like any other data.  Bassline does not want a separate
-metadata plane that is somehow more real than the information being
-exchanged.
+A message is:
+- Data
+- Anonymous
+- Sovereign
+- Portable and easy to share
+- Free of "meta-data"
+- Free of a priveledged meaning
 
-*Note: The following is a bit of new prose for messages i'm testing*
+Let's expand on these
 
-Messages are data, not "code". They are inert unless interpreted and
-acted upon.  Interpreting a message is the local act of "binding" the
-meaning of message to some local program execution.
+**** Messages are data
 
-As such it doesn't violate our model of messaging & communication, if
-there exists purely local capabilities bound by other local
-participants, traveling ALONGSIDE the data.
+Messages are fundamentally data. They are values, and are easily
+shared over the wire, stored, etc.
 
-This is equivalent to ports, we don't care who added these
-capabilities, but we can observe them and act on them locally.
+They do not have a declared schema other than being "dictionaries" at
+the top level.
 
-This isn't possible in all systems, but it's a useful pattern none the less.
+Because they are data a message is intert and you are free to be
+replicated and shared as you wish.
 
-The constraints to make this "work" are:
-- capabilities must be allowed to be ignored
+**** Messages are anonymous
+
+When we say a message is anonymous, it simply means we cannot address
+a message.
+
+A message can be bound to a name locally, giving us a way to refer to
+it. But that is a property of the binding, not of the message.
+
+You also might have a way of identifying a message such as an id or a
+hash. But this not fundamental to a message.
+
+**** Messages are sovereign
+
+*This is an important point, so listen up!*
+
+Messages are ontologically sovereign. Meaning they have no special
+meaning other than what meaning you choose to assign to it.
+
+As such, when receiving a message that message is YOURS. It's
+"meaning" and what it entails is completely decided by you. A message
+can contain information to make this process easier, but a message
+doesn't have an absolutely true interpretation.
+
+This is why there is no "metadata" for a message. Because metadata
+blesses a canonical form of what is the "content" and what is "about
+the message". This violates the ontological sovereignty of a message.
+
+As such any "metadata" kind of things belong in the message directly
+like any other data. The "meta-ness" of the data is the choice of the
+receiver of the message.
+
+**** Messages can have capabilities
+
+When passing messages around individuals may choose to enrich a
+message with capabilities. A capability, or "cap" for short, is a
+uni-directional opaque function that can travel alongside the data of
+a message in-process.
+
+Conceptually, it gives the anonymous message an anonymous way to speak
+to something. Kinda like being handed a phone that's already on a
+call, but they are on mute.
+
+You can speak into it, they don't know who you are, since they dialed
+"not-you", nor do you know who they are. But you are connected through
+some chain of events that caused you to be able to speak with them.
+
+TODO: Update this prose to be better.
+
+In order for this to work:
+- capabilities must be ignorable
 - capabilities must never return values directly, they should be
   opaque
-- capabilities shouldn't removed data from the message itself, they
-  should only enrich it for those interested
 - capabilities cannot travel over the wire, unless they are reified as
   a higher order message.
 
 *** Concretely
 
-TODO: Update prose
-A message is a plain object with string keys. It can be empty,
-partially filled, or nested inside other messages.
+As we established in the abstract section, messages are the most
+important concept in bassline.
 
-The concrete representation is intentionally minimal. Plain objects
-are open-ended, nest naturally, and are easy to serialize, enrich, and
-inspect. That keeps the message lightweight and avoids forcing a
-closed protocol up front.
+It contains data as a dictionary with string keys, as well as a
+distinct space for capabilities in process.
+
+When serializing or transporting messages, only the data is kept, and
+caps must be reified as data in order to be mobile.
+
+This implementation isn't really special, and you could implement an
+alternative kind of Msg, but this works well and is very ergonomic
+compared to other approaches.
 
 #+NAME: message-impl
 #+BEGIN_SRC js
@@ -102,27 +204,42 @@ closed protocol up front.
     [v => Object.keys(v).every(is.string), 'cap keys must be strings'],
     [v => Object.values(v).every(is.fn), 'cap values must be functions']
   ])
-
   const validData = invariants([
     [is.object, 'data must be an object'],
+    [v => Object.keys(v).every(is.string)],
     [v => !is.array(v), 'data cannot be an array']
   ])
+
+  export function msg(data = {}, caps = {}) {
+    if (is.msg(data)) return data.copy().grantAll(caps)
+    return new Msg(data, caps)
+  }
 
   export class Msg {
     data = {}
     caps = new Map()
+    #controller = createController()
 
     constructor(data = {}, caps = {}) {
       validData(data)
       validCaps(caps)
-      const { ctl, close } = createController()
-      this.ctl = ctl
-      this.close = close
-      this.merge(data)
-      this.grantAll(caps)
-      this.ctl.onClose(() => {
-        this.caps.clear()
-      })
+      this
+        .merge(data)
+        .grantAll(caps)
+        .onClose(() => this.caps.clear())
+    }
+
+    // lifecycle
+    get ctl() {
+      return this.#controller.ctl
+    }
+
+    get close() {
+      return this.#controller.close
+    }
+
+    get closed() {
+      return this.ctl.closed
     }
 
     closes(...targets) {
@@ -131,15 +248,25 @@ closed protocol up front.
     }
 
     onClose(fn) {
-      return this.ctl.onClose(fn)
+      this.ctl.onClose(fn)
+      return this
     }
 
-    copy(data = {}) {
-      const msg = new Msg({ ...this.data, ...data })
-      for (const [k, v] of this.caps) {
-        msg.grant(k, v)
+    // data access
+    get(key) {
+      if(is.array(key)) {
+        return key.map(k => this.get(k))
       }
-      return msg
+      return this.data[key]
+    }
+
+    delete(key) {
+      if(is.array(key)) {
+        key.forEach(k => this.delete(k))
+        return this
+      }
+      delete this.data[key]
+      return this
     }
 
     merge(data) {
@@ -148,31 +275,29 @@ closed protocol up front.
     }
 
     has(key) {
+      if(is.array(key)) {
+        return key.every(k => this.has(k))
+      }
       return key in this.data
     }
 
-    hasKeys(keys) {
-      return keys.every(k => this.has(k))
+    get keys() {
+      return Object.keys(this.data)
     }
 
-    get(key) {
-      return this.data[key]
-    }
-
-    delete(key) {
-      delete this.data[key]
-      return this
-    }
-
+    // cap access
     hasCap(key) {
+      if(is.array(key)) {
+        return key.every(k => this.hasCap(k))
+      }
       return this.caps.has(key)
     }
 
-    hasCaps(keys) {
-      return keys.every(k => this.hasCap(k))
-    }
-
     revoke(spelling) {
+      if(is.array(spelling)) {
+        spelling.forEach(s => this.revoke(s))
+        return this
+      }
       this.caps.delete(spelling)
       return this
     }
@@ -189,6 +314,11 @@ closed protocol up front.
       return this
     }
 
+    get capKeys() {
+      return Array.from(this.caps.keys())
+    }
+
+    // cap invocation
     invoke(spelling, arg = new Msg()) {
       validCapName(spelling)
       const cap = this.caps.get(spelling)
@@ -200,6 +330,15 @@ closed protocol up front.
       return this.invoke('send', msg)
     }
 
+    // manipulation
+    copy(data = {}) {
+      const msg = new Msg({ ...this.data, ...data })
+      for (const [k, v] of this.caps) {
+        msg.grant(k, v)
+      }
+      return msg
+    }
+
     do(fn) {
       return fn(this)
     }
@@ -208,16 +347,83 @@ closed protocol up front.
       return fn(this.copy())
     }
 
+    // predicate testing
     conforms(description) {
       return conforms(description)(this.data)
     }
   }
-
-  export function msg(data = {}, caps = {}) {
-    if (is.msg(data)) return data.grantAll(caps)
-    return new Msg(data, caps)
-  }
 #+END_SRC
+
+**** Invariants
+
+Messages have a couple invariants:
+- Cap keys must be strings
+- Cap values must be functions
+- Data must be an object with string keys
+
+The rest is free form
+
+**** Lifecycle
+
+Messages have their own lifecycle. This is managed by the
+=createController= construct we define.
+
+When a message is closed, it's caps are cleared.
+
+With the exception of =signal=, the message has the same interface as
+the return from createController.
+
+**** Data Access
+
+Most of the access methods on the class are polymorphic.
+
+If passed a string, they will do a singular version of something.
+Otherwise if given an array, they will do it for each element of the array.
+
+When it makes sense, most operations try to return =this=, to allow for
+method chaining.
+
+We omit a =set= method on the message, so if you want to change the
+data, use merge which passes in an object, which is merged into the
+data.
+
+**** Cap Access
+
+Similar to above, but caps are a flat map.
+
+=invoke= is a no-op when a message lacks a capability. This can be
+tested for if needed.
+
+The only "sugar" included in the message class is =.send=, which
+internally just uses =this.invoke('send', arg)=.
+
+The reason this gets a pass is because it's the most common operation
+we perform.
+
+**** Manipulation
+
+The message implementation exposes a =copy= method for when we want to
+copy a message. It performs a shallow copy of the data, and shares
+the caps of the copied message.
+
+The =copy= method also takes an optional argument of data to merge into
+the copy. Because most of the time when we copy, we are adding new
+data to the message.
+
+*IMPORTANT!* The resulting message has it's own lifecycle, meaning
+closing the source message, has no impact on the copy.
+
+In addition to this, we offer 2 helpful methods for misc message manipulation.
+
+1. =do(aFn)=
+
+   Takes a function, and passes this directly as the sole argument,
+   returning whatever the function returns.
+
+2. =map(aFn)=
+
+   Similar to do, but passes a =copy= into the function so changes don't
+   mutate this message.
 
 ** Communication
 :PROPERTIES:
@@ -248,57 +454,70 @@ cannot locally see.
 
 *** Concretely
 
-In this book, communication is implemented with ports.
+The communication constructs in Bassline are implemented as functions
+that return a tuple: =[message, locals]=
 
-A port gives us the 2 capabilities discussed above, as well as a
-=close= capability:
+The =message= returned from the tuple includes all caps for the
+primitive. Whereas locals, depending on the construct, is things that
+aren't capabilities, such as =recv= for ports, =to= for propagators, etc.
 
-1. =send(msg) -> void=
+The lifecycle of the communication construct is commonly tied to the
+message. So when =message= closes, the communication construct is shutdown.
 
-   Which let's us send a message to something
+The fact that our communication constructs have a message represention
+with caps, it means they can be shared as messages for others to use,
+but you cannot send the =locals= as a message directly!
 
-2. =recv() -> Promise<msg>=
-
-   Which let's us pull a message from a local buffer, blocking until
-   one is available.
-
-3. =close() -> void=
-
-   To ignore any future messages, stopping communication from our end.
+**** Port
 
 A port is a minimal surface that faithfully implements what we care
 about for communication.
 
-An important thing to note is that there is no builtin lifecycle
-propagation with ports.  This is because closing a port is a local
-decision made when a participant decides they aren't interested
-anymore, or that the conversation is not useful to them anymore.
+It's message has 2 caps:
 
-Senders are not notified and their messages are dropped should they
-send to the closed port.  This ensures neither side requires knowledge
-of the other's state / status without the other side explicitly
-sharing this.
+1. =send=
 
-**** Port implementation
+   Which let's us send a message to the port
+
+2. =close=
+
+   *This is distinct from the =message.close()=!*
+
+   This let's us explicitly shutdown the port, making sends no-ops.
+
+   It's important to note that there is no builtin lifecycle
+   propagation with ports. It's trivial to include, but is leaky to
+   include. This is because knowing how to "send" to something,
+   doesn't mean we know it's alive, or that they can communicate with
+   us.
+
+   Senders are not notified and their messages are dropped should they
+   send to the closed port.  This ensures neither side requires
+   knowledge of the other's state / status without the other side
+   explicitly sharing this, maintaining the sovereignty of the caps.
+
+   You should still communicate when you die though but we can't force you.
+   "#messaging-in-my-grave"
+
+***** Port implementation
 
 The port implementation is rather simple.
 
 It maintains a buffer for messages, and a queue of promises to
-resolve.  We can give the buffer a fixed capacity, in which it will
+resolve. We can give the buffer a fixed capacity, in which it will
 act as a sliding buffer, dropping the oldest messages.  Or if we give
 it a capacity of 0, it will not buffer any messages, requiring a
 listener actively be waiting for a message, dropping all others.
 
-The only other thing to note is the local convenience of EOF.
+The only other thing to note is the EOF symbol. This symbol is sent
+through and used by local port consumers to indicate that the port
+closed.  It is not universal and will serialize over the wire
+meaningfully.  It only exists to make our lives simpler in js.  And it
+is trivial to build your own interpretation of what should signal EOF
+locally.
 
-EOF is a symbol sent through and used by local port consumers to
-indicate that the port closed.  It is not universal and will serialize
-over the wire meaningfully.  It only exists to make our lives simpler
-in js.  And it is trivial to build your own interpretation of what
-should signal EOF locally.
-
-You cannot send EOF directly through a port, nor should you ever have
-to.  It should only be created internally inside of a port to notify a
+You cannot pass EOF directly through a port's =send=, nor should you ever have
+to. It should only be created internally inside of a port to notify a
 local consumer we are closed.
 
 #+begin_src js :noweb no-export
@@ -310,7 +529,7 @@ local consumer we are closed.
     const m = new Msg({description})
     m.grantAll({
         send: msg => {
-          if (is.eof(msg)) throw new Error('Bassline EOF is reserved')
+          if (is.eof(msg)) throw failure('Bassline EOF is reserved')
           // resolve the promise if we have a waiter
           if (waiters.length > 0) return waiters.shift()(msg)
           // drop a message if we are over capabity
@@ -320,25 +539,35 @@ local consumer we are closed.
         },
         close: m.close
       })
-    m.ctl.onClose(() => {
+    m.onClose(() => {
       for (const w of waiters) w(EOF)
       waiters.length = 0
     })
     function recv() {
       if (buffer.length > 0) return Promise.resolve(buffer.shift())
-      if (m.ctl.closed) return Promise.resolve(EOF)
+      if (m.closed) return Promise.resolve(EOF)
       return new Promise(resolve => waiters.push(resolve))
     }
     return [m, recv]
   }
 #+end_src
 
-**** Port usage
-
-***** Propagator
+**** Propagator
 
 A propagator let's us define something that can selectively propagate
 interesting messages to multiple targets.
+
+When constructing a propagator, you provide a propagation function,
+this takes 2 arguments: =aMsg= and =propagate=. Propagate simply forwards
+the value to the targets. This allows us to propagate multiple times
+per invocation.
+
+You can also use a propagator without forwarding as a reactive
+computation by just not calling propagate in the body.
+
+A propagator's message exposes the same caps as a port, making them
+behaviorally equivalent as messages. However unlike =port=, a propagator
+doesn't buffer. It eagerly does work.
 
 Cycles are supported and encouraged, just make sure you correctly
 setup your propagators to ignore irrelevant information.
@@ -352,7 +581,7 @@ functions, it's probably cleaner since we can do lifecycle stuff.*
     const m = new Msg({description})
     const targets = new Set()
     const propagate = value => targets.forEach(t => t(value))
-    m.ctl.onClose(() => targets.clear())
+    m.onClose(() => targets.clear())
 
     const to = (...dests) => {
       dests.forEach(d => targets.add(d))
@@ -373,7 +602,22 @@ functions, it's probably cleaner since we can do lifecycle stuff.*
 
 **** Cell
 
-A propagator with state
+This is almost identical to =propagator=. The only difference is the
+function is a bit different, and it closes over some private state.
+
+The =merge= function takes 3 arguments:
+
+1. =current=
+   The current value of the state
+2. =incoming=
+   The received message
+3. =update=
+   A function that updates state and propagates the new value.
+
+When building cells, it's best to ensure they are Associative,
+Commutative, and Idempotent. This let's any cell behave as a CRDT with caps!
+
+*NOTE: Probably want to make the state a message, but it's a wip*
 
 #+begin_src js
   export function cell(merge, init) {
@@ -390,8 +634,9 @@ A propagator with state
   }
 #+end_src
 
-***** Consume
+**** Consume
 
+This is the most common way to use a port. It takes a =recv= function
 The most common way to use a port, is inside of an endless async loop
 that exits when we recv EOF. We define a helper for this called
 =consume=. It let's us use a recv fn to manage the inputs for a
@@ -399,45 +644,47 @@ propagator, as well as it's lifecycle.
 
 #+begin_src js
   export function consume(recv, callback) {
-    const [m, to] = propagator(callback)
-    const description = 'I am a consumed port. I am a propagator driven by a port.'
-    m.merge({description})
+    const description = `\
+  I am a consumed port.
+  Internally I am a propagator driven by a port's recv.`
+
+    const [prop, to] = propagator(callback)
+    prop.merge({description})
+
     const promise = (async () => {
-      const closed = new Promise(resolve => m.ctl.onClose(() => resolve(EOF)))
-      while (!m.ctl.closed) {
+      const closed = new Promise(resolve => prop.onClose(() => resolve(EOF)))
+      while (!prop.closed) {
         const msg = await Promise.race([recv(), closed])
         if (is.eof(msg)) break
-        m.invoke('send', msg)
+        prop.invoke('send', msg)
       }
-      m.invoke('close')
-      m.close()
+      prop.close()
     })()
-    return [m, {to, promise}]
+
+    return [prop, {to, promise}]
   }
 #+end_src
 
 **** Nets
 
-Current our ports look like "point-to-point" communication, however in
+Current ports look like "point-to-point" communication, however in
 Bassline we don't talk to "something", we observe information from our
-perspective, and send through opaque handles.
+perspective, and invoke caps through opaque handles. We can exploit
+this fact to build a =net=.
 
-This let's us do some neat things when it comes to communication.
+A =net= is a local structure that gives us ports backed by any number of
+things.  Meaning that we build a compound communication interface
+without the consumers or producers ever knowing directly, since it has
+the same caps as a port.
 
-For example, a common structure we use is a =net=.
-
-A =net= is a local structure that gives us ports backed by any number
-of things.  Meaning that we build a compound communication interface
-without the consumers or producers ever knowing directly.  They might
-be able to tell if they see more information, but they can never know
-for sure.
-
-This highlights that in bassline cooperating participants appear as a
-single participant, even if they are totally unaware of each other.
+This structure is a decent showcase that "participant" is a very loose
+term in Bassline.
 
 #+begin_src js
   export function net() {
-    const description = 'I am a net. I implement seamless multi-party communication.'
+    const description = `\
+  I am a net.
+  I implement seamless multi-party communication.`
     const ports = new Set()
     const netm = new Msg({description})
 
@@ -454,11 +701,14 @@ single participant, even if they are totally unaware of each other.
           p.send(msg)
         }
       })
+
+      netm.closes(fromNet, toNet)
+      fromNet.closes(toNet)
+      toNet.closes(fromNet)
+
       ports.add(fromNet)
-      netm.ctl.closes(fromNet)
-      fromNet.ctl.closes(toNet)
-      toNet.ctl.closes(fromNet)
-      fromNet.ctl.onClose(() => ports.delete(fromNet))
+      fromNet.onClose(() => ports.delete(fromNet))
+
       return [toNet, recv]
     }
 
@@ -481,8 +731,10 @@ tools.
 
 ** Concretely
 
-Every transport produces the same thing: a port with =send=, =recv=,
-and =close=. What differs is the medium underneath and whether that
+Every transport produces the same thing as ports do. They produce a message with
+=send= and =close= caps. And a local =recv= function.
+
+The only difference is the medium underneath and whether that
 medium carries raw bytes or discrete messages.
 
 Byte transports (TCP sockets, stdio, serial) carry raw chunks. They
@@ -503,7 +755,7 @@ propagating messages it parses without issue.
 On error, we simply console.warn for now. Though this can be replaced.
 One input chunk may produce zero or many messages.
 
-=format= is a plain function that serializes a message as a JSON line. This
+=format= is a stateless function that serializes a message as a JSON line. This
 is used on the outgoing side to serialize before writing.
 
 #+begin_src js
@@ -538,13 +790,7 @@ is used on the outgoing side to serialize before writing.
     return [m, to]
   }
 
-  export const format = aMsg => {
-    let data = aMsg
-    if(is.msg(aMsg)) {
-      data = aMsg.data
-    }
-    return JSON.stringify(data) + '\n'
-  }
+  export const format = aMsg => JSON.stringify(aMsg.data) + '\n'
 
   export default { reader, format }
 #+end_src
@@ -560,42 +806,43 @@ chunks, a message port for parsed messages, and bridges them through
 the socket.
 
 #+begin_src js
-  import net from 'node:net'
-  import { msg, port } from '../bassline.js'
-  import defaultFrame from '../frame/jsonl.js'
+    import net from 'node:net'
+    import { msg, port } from '../bassline.js'
+    import defaultFrame from '../frame/jsonl.js'
 
-  const description = `\
-  I am a socket.
-  I allow interactions with socket-like interfaces.
-  Any messages I am sent, is forwarded over the wire as data.`
+    const description = `\
+    I am a socket.
+    I allow interactions with socket-like interfaces.
+    Any messages I am sent, is forwarded over the wire as data,
+    stripping it's caps.`
 
-  export function fromSocket(socket, frame = defaultFrame) {
-    const outgoing = msg({description}, {send, close})
-    const [reader, onRead] = frame.reader()
-    const [msgs, recv] = port()
-    onRead(m => msgs.send(m))
+    export function fromSocket(socket, frame = defaultFrame) {
+      const outgoing = msg({description}, {send, close})
+      const [reader, onRead] = frame.reader()
+      const [msgs, recv] = port()
+      onRead(m => msgs.send(m))
 
-    function send(m) {
-      socket.write(frame.format(m))
+      function send(m) {
+        socket.write(frame.format(m))
+      }
+      function close() {
+        outgoing.close()
+      }
+
+      outgoing.ctl.closes(reader, msgs)
+      outgoing.ctl.onClose(() => socket.destroy())
+
+      socket.on('data', chunk => reader.send(msg({scalar: chunk.toString()})))
+      socket.on('close', close)
+      socket.on('end', close)
+      socket.on('error', close)
+
+      return [outgoing, recv]
     }
-    function close() {
-      outgoing.close()
+
+    export function connect(options = {}, frame = defaultFrame) {
+      return fromSocket(net.createConnection(options), frame)
     }
-
-    outgoing.ctl.closes(reader, msgs)
-    outgoing.ctl.onClose(() => socket.destroy())
-
-    socket.on('data', chunk => reader.send(msg({scalar: chunk.toString()})))
-    socket.on('close', close)
-    socket.on('end', close)
-    socket.on('error', close)
-
-    return [outgoing, recv]
-  }
-
-  export function connect(options = {}, frame = defaultFrame) {
-    return fromSocket(net.createConnection(options), frame)
-  }
 #+end_src
 
 *** Serving (TCP)
@@ -622,17 +869,16 @@ connections. Each connection is itself a port, produced by
 
     const server = nodeNet.createServer(socket => {
       const [client, recv] = fromSocket(socket, frame)
-      m.ctl.closes(client)
+      m.closes(client)
       onConnect([client, recv])
     })
 
-    m.ctl.closes(server)
+    m.closes(server)
     server.listen(options)
 
-    const close = () => m.close()
-    m.grant('close', close)
-    server.on('close', close)
-    server.on('error', close)
+    m.grant('close', m.close)
+    server.on('close', m.close)
+    server.on('error', m.close)
 
     return [m, server]
   }
@@ -659,16 +905,15 @@ core.
 
   export function serve(wss, onConnect) {
     const m = msg({description})
-    m.ctl.closes(wss)
+    m.closes(wss)
     wss.on('connection', ws => {
       const [client, recv] = fromWebSocket(ws)
-      m.ctl.closes(client)
+      m.closes(client)
       onConnect([client, recv])
     })
-    const close = () => m.close()
-    m.grant('close', close)
-    wss.on('close', close)
-    wss.on('error', close)
+    m.grant('close', m.close)
+    wss.on('close', m.close)
+    wss.on('error', m.close)
 
     return [m, wss]
   }
@@ -700,18 +945,17 @@ native =WebSocket=, in Node.js with the =ws= package, and for
       }
     })
 
-    const close = () => outgoing.close()
-    ws.addEventListener('close', close)
-    ws.addEventListener('error', close)
+    ws.addEventListener('close', outgoing.close)
+    ws.addEventListener('error', outgoing.close)
 
     outgoing.grantAll({
       send: m => {
         const data = m.data
         if(data) ws.send(JSON.stringify(data))
       },
-      close: () => outgoing.close()
+      close: outgoing.close,
     })
-    outgoing.ctl.closes(msgs, ws)
+    outgoing.closes(msgs, ws)
 
     return [outgoing, recv]
   }
@@ -736,14 +980,14 @@ clone. Objects cross the boundary without serialization. Works with
     messagePort.onmessage = e => msgs.send(msg(e.data))
     messagePort.onmessageerror = () => outgoing.close()
 
-    outgoing.ctl.closes(msgs, messagePort)
+    outgoing.closes(msgs, messagePort)
 
     outgoing.grantAll({
       send: m => {
         const data = m.data
         if(data) messagePort.postMessage(data)
       },
-      close: () => outgoing.close()
+      close: outgoing.close
     })
     return [outgoing, recv]
   }
@@ -775,10 +1019,10 @@ produce a port of messages.
     const outgoing = msg({description})
       .grantAll({
         send: m => process.stdout.write(frame.format(m)),
-        close: () => outgoing.close()
+        close: outgoing.close
       })
 
-    outgoing.ctl.closes(msgs, rl, reader)
+    outgoing.closes(msgs, rl, reader)
 
     rl.on('line', line => reader.send(msg({scalar: line + '\n'})))
     rl.on('close', () => outgoing.close())
@@ -794,20 +1038,20 @@ produce a port of messages.
 
   const scalarTypes = ["string", "boolean", "symbol", "number"]
   export const is = {
-    eof: (v) => v === EOF,
-    nil: (v) => v == null || Number.isNaN(v),
-    null: (v) => v === null,
-    undefined: (v) => v === undefined,
-    promise: (v) => v instanceof Promise,
-    boolean: (v) => typeof v === "boolean",
-    number: (v) => typeof v === "number" && !Number.isNaN(v),
-    string: (v) => typeof v === "string",
-    fn: (v) => typeof v === "function",
-    symbol: (v) => typeof v === "symbol",
-    array: (v) => Array.isArray(v),
-    object: (v) => typeof v === "object" && v !== null,
-    msg: (v) => v instanceof Msg,
-    scalar: (v) => is.null(v) || scalarTypes.includes(typeof v),
+    eof: v => v === EOF,
+    nil: v => v == null || Number.isNaN(v),
+    null: v => v === null,
+    undefined: v => v === undefined,
+    promise: v => v instanceof Promise,
+    boolean: v => typeof v === "boolean",
+    number: v => typeof v === "number" && !Number.isNaN(v),
+    string: v => typeof v === "string",
+    fn: v => typeof v === "function",
+    symbol: v => typeof v === "symbol",
+    array: v => Array.isArray(v),
+    object: v => typeof v === "object" && v !== null,
+    msg: v => v instanceof Msg,
+    scalar: v => is.null(v) || scalarTypes.includes(typeof v),
   }
 
   export class AssertionFailure extends Error {}
@@ -819,22 +1063,22 @@ produce a port of messages.
     function assert(value) {
       for (const [pred, msg = (_v) => "assertion failed"] of preds) {
         if (!pred(value)) {
-          if (is.fn(msg)) throw failure(msg(value));
-          throw failure(msg);
+          if (is.fn(msg)) throw failure(msg(value))
+          throw failure(msg)
         }
       }
-      return value;
+      return value
     }
     assert.test = (value) => {
       try {
-        assert(value);
-        return true;
+        assert(value)
+        return true
       } catch (e) {
         if (e instanceof AssertionFailure) return false;
-        throw e;
+        throw e
       }
-    };
-    return assert;
+    }
+    return assert
   }
 
   export const satisfiesAll = preds => val => preds.every(p => p(val))
@@ -860,31 +1104,31 @@ produce a port of messages.
   }
 
   export function createController() {
-    const controller = new AbortController();
-    const signal = controller.signal;
+    const controller = new AbortController()
+    const signal = controller.signal
     const ctl = {
       onClose(fn, aSignal) {
-        if (ctl.closed) return void fn();
-        signal.addEventListener("abort", fn, { once: true, signal: aSignal });
+        if (ctl.closed) return void fn()
+        signal.addEventListener("abort", fn, { once: true, signal: aSignal })
       },
       closes(...controllers) {
         for (const c of controllers) {
-          ctl.onClose(() => c.close(), c?.ctl?.signal);
+          ctl.onClose(() => c.close(), c?.ctl?.signal)
         }
       },
       get closed() {
-        return signal.aborted;
+        return signal.aborted
       },
       signal,
-    };
-    function close(reason = "closed") {
-      if (ctl.closed) return;
-      controller.abort(reason);
     }
-    return { close, ctl };
+    function close(reason = "closed") {
+      if (ctl.closed) return
+      controller.abort(reason)
+    }
+    return { close, ctl }
   }
 
-  export const delay = (ms = 1000) => new Promise((res) => setTimeout(res, ms));
+  export const delay = (ms = 1000) => new Promise((res) => setTimeout(res, ms))
 #+end_src
 
 #+BEGIN_EXPORT html
