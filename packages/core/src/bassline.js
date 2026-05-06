@@ -208,6 +208,13 @@ export class Msg {
     return this
   }
 
+  shareCaps(aMsg) {
+    for (const [k, v] of this.caps) {
+      aMsg.grant(k, v)
+    }
+    return this
+  }
+
   get capKeys() {
     return Array.from(this.caps.keys())
   }
@@ -226,11 +233,15 @@ export class Msg {
 
   // manipulation
   copy(data = {}) {
-    const msg = new Msg({ ...this.data, ...data })
-    for (const [k, v] of this.caps) {
-      msg.grant(k, v)
-    }
-    return msg
+    const aMsg = new Msg({ ...this.data, ...data })
+    this.shareCaps(aMsg)
+    return aMsg
+  }
+
+  eat(aMsg, eatData = true, eatCaps = true) {
+    if (eatData) this.merge(aMsg.data)
+    if (eatCaps) aMsg.shareCaps(this)
+    return this
   }
 
   do(fn) {

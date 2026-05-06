@@ -7,7 +7,7 @@
 #+HTML_HEAD: <link rel="stylesheet" href="style.css"/>
 
 * Introduction
-This literate document contains the source code for the core of [[https://bassline.dev][Bassline]] v2.
+This literate document contains the source code for the core of [[https://bassline.dev][Bassline]] v2.5.
 
 It is designed to be hacked on and modified, so we encourage people to
 read this!
@@ -17,19 +17,23 @@ read this!
 Bassline is built to make distributed programming dramatically simpler,
 easier, and more flexible.
 
-Specifically we, at Bassline, are most interested in how this
+Specifically, at Bassline, we are most interested in how this
 simplifies decentralized distributed programming. An area that outside
-of blockchains or very specific protocols is relatively
-starved.
+of blockchains or very specific protocols is relatively starved.
 
 Bassline offers a programming / epistemic model that allows arbitrary
 programs & devices to collaborate and interact in an insanely small
 package. It demands almost nothing from participants, is trivial to
 support, and thrives in truly hetergenous settings.
 
-This is enabled not by something we built, specifically it's what we omit.
+This is possible by what we choose to omit from our "Bassline", not by
+what we include.
 
 ** The Boogeyman
+
+#+ATTR_HTML: :width 500px :align center
+#+ATTR_ORG: :align left
+[[./evangel.jpeg]]
 
 Distributed programming has the same reputation as a boogeyman. It's
 something that you check for under your bed at night. And it's
@@ -41,54 +45,59 @@ this "beast". They offer salvation through system images,
 microservices, monoliths, and more specifications. Yet none of these
 fully solve the problem.
 
-We don't believe distributed programming is a boogeyman, it's just
-misunderstood. More like a particularly moody cat or an alligator.
+We don't believe distributed programming is a boogeyman, we think it's
+just misunderstood. The biggest misunderstanding, we believe, is the
+extreme cost uncontrolled proliferation of non-local ontology.
 
 In local programming we commonly build programs in terms of "things"
 and what they mean. It is an act of building a local ontology to
-express the program we want.
-
-We believe that the uncontrolled proliferation of this idea (we refer
-to this as non-local ontology) is EXTREMELY harmful in distributed
-settings. The root problem is that, in a distributed setting, there
-are literally no "things". A distributed program is just a program
-running on a single machine that talks with the outside world via
-local affordances. There is no "message broker", there is locally
-received messages that I locally assign to be coming from a message broker.
+express the program we want. But the issue is that when switching to a
+distributed setting, there are no "things". A distributed program is
+just a program running on a single machine that talks with the outside
+world via local affordances. There is no "message broker", there is
+locally received messages that I locally assign to be coming from a
+message broker.
 
 Bassline doesn't fight this, in fact we lean into it fully. We
-acknowledge that outside of our local programs, we literally can't
-know anything. There is an extreme asymetry of information between
-"what I know currently" and "literally everything else".
+acknowledge that outside of our local programs, we can't know anything
+concrete, we can only observe messages. There is natural information
+asymmetry between "what I know currently" and "everything else".
 
 So rather than build from "things", we build from communcation, with
-the commitment being we do not provide tools that that aren't also
-available in the most hardcore p2p setting you can image. The result
+the commitment being we do not build from things that aren't also
+available in the most extreme p2p setting you can imagine. The result
 is a system that is decentralized & distributed by construction, yet
 totally ontologically sovereign.
 
-** Old TLDR
+** Related Works & Important Differences
 
-Bassline is a built for partial information programming.
+This isn't the first system to focus on communication. But we believe
+we expand on some of the ideas in subtle but important ways.
 
-Programs in Bassline work with incomplete messages. They build local
-understanding from what they already know while acting on new information.
+Things like the actor model, ocap systems, etc are much less
+"thing-oriented" than other systems. But they still make some global
+ontological commitments for the kind of shape the system has.
 
-Anything outside your local perspective is encountered through
-communication.  When that communication yields information that
-matters, we observe it as a resource.  We do not need a complete
-account of what it is, where it is, or how it produces what we
-receive.
+The tricky thing is that these commitments to the system shape mandate
+their supporting constructs since the worldview & model requires them.
 
-Identity, location, provenance, timing, and order are therefore not
-taken as settled facts.  They are local judgments made from partial
-information.  Different participants may have different grounds for
-believing them, and that is good.
+*** TODO Expand on the issues of blessed addressing & identity
+- Identity is a local judgement
+- Addressing requires specific topologies & protocols
+- Bassline doesn't preclude addressing or identity, we just don't
+  build it in the foundation, since it doesn't hold in all settings.
+- This means that in Bassline you can use whatever you want / need,
+  because we don't bless any kind of communication / connection.
 
-The model never assumes a closed world, so growth uses the same
-mechanism as ordinary operation.  New message shapes, participants,
-and behavior do not require a separate extensibility system, they
-arrive as more messages to interpret.
+*** TODO Expand on the issues of symmetric communication
+- The ability to receive information doesn't imply the ability to respond
+- The ability to respond to something doesn't imply the ability to be receive
+- These become more powerful when you have anonymous communication and
+  no standard identity
+
+*** TODO Expand on the tyranny of names
+- anonymous messages and caps gives us implicit / tacit apis
+- Removes the concept of an "endpoint" because it's not there
 
 * The Kernel
 The kernel starts with messages and local capabilities for
@@ -123,8 +132,8 @@ shared over the wire, stored, etc.
 They do not have a declared schema other than being "dictionaries" at
 the top level.
 
-Because they are data a message is intert and you are free to be
-replicated and shared as you wish.
+Because they are data and you are free to be replicated and shared as
+you wish.
 
 **** Messages are anonymous
 
@@ -142,7 +151,7 @@ hash. But this not fundamental to a message.
 *This is an important point, so listen up!*
 
 Messages are ontologically sovereign. Meaning they have no special
-meaning other than what meaning you choose to assign to it.
+meaning other than the meaning you choose to assign to it.
 
 As such, when receiving a message that message is YOURS. It's
 "meaning" and what it entails is completely decided by you. A message
@@ -172,14 +181,13 @@ You can speak into it, they don't know who you are, since they dialed
 "not-you", nor do you know who they are. But you are connected through
 some chain of events that caused you to be able to speak with them.
 
-TODO: Update this prose to be better.
+***** TODO Update this prose to be better.
 
 In order for this to work:
 - capabilities must be ignorable
 - capabilities must never return values directly, they should be
   opaque
-- capabilities cannot travel over the wire, unless they are reified as
-  a higher order message.
+- capabilities cannot travel over the wire, unless they are reified as data
 
 *** Concretely
 
@@ -314,6 +322,13 @@ compared to other approaches.
       return this
     }
 
+    shareCaps(aMsg) {
+      for (const [k, v] of this.caps) {
+        aMsg.grant(k, v)
+      }
+      return this
+    }
+
     get capKeys() {
       return Array.from(this.caps.keys())
     }
@@ -332,11 +347,15 @@ compared to other approaches.
 
     // manipulation
     copy(data = {}) {
-      const msg = new Msg({ ...this.data, ...data })
-      for (const [k, v] of this.caps) {
-        msg.grant(k, v)
-      }
-      return msg
+      const aMsg = new Msg({ ...this.data, ...data })
+      this.shareCaps(aMsg)
+      return aMsg
+    }
+
+    eat(aMsg, eatData = true, eatCaps = true) {
+      if(eatData) this.merge(aMsg.data)
+      if(eatCaps) aMsg.shareCaps(this)
+      return this
     }
 
     do(fn) {
@@ -384,8 +403,8 @@ When it makes sense, most operations try to return =this=, to allow for
 method chaining.
 
 We omit a =set= method on the message, so if you want to change the
-data, use merge which passes in an object, which is merged into the
-data.
+data, use =merge= which passes in an object, which is merged into the
+data. You can also use =copy= to do this for a freshly copied message.
 
 **** Cap Access
 
@@ -451,6 +470,16 @@ Communication in Bassline is built from two primitives, =send= and =recv=.
 So long as these are opaque, it means our programs work in arbitrary
 environments because they never assumed anything about what they
 cannot locally see.
+
+*IMPORTANT:* Why recv cannot be a capability
+
+In order for something to be a capability, it must be an opaque way of
+speaking. Because this is the most we can commit to in a distributed
+setting without leaking commitments that don't hold. As such, =recv= is
+not allowed to be a capability. I cannot give you a way of receiving a
+message because receiving a message is always through your local
+affordances. The only thing we can do in a distributed setting, is communicate
+ways of communicating through an existing medium.
 
 *** Concretely
 

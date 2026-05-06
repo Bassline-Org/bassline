@@ -3,108 +3,673 @@
 "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
-<!-- 2026-04-06 Mon 12:28 -->
+<!-- 2026-05-06 Wed 00:11 -->
 <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Bassline V2</title>
+<title>Bassline V2.5</title>
 <meta name="author" content="Goose" />
 <meta name="generator" content="Org Mode" />
 <link rel="stylesheet" href="style.css"/>
 </head>
 <body>
 <div id="content" class="content">
-<h1 class="title">Bassline V2
+<h1 class="title">Bassline V2.5
 <br />
-<span class="subtitle">Non-local ontology considered harmful</span>
+<span class="subtitle">I have no send but I must scream</span>
 </h1>
 <div id="table-of-contents" role="doc-toc">
 <h2>Table of Contents</h2>
 <div id="text-table-of-contents" role="doc-toc">
 <ul>
-<li><a href="#org4c766e0">1. Introduction</a>
+<li><a href="#org58d3f42">1. Introduction</a>
 <ul>
-<li><a href="#org29fe7f4">1.1. TLDR</a></li>
+<li><a href="#org7451407">1.1. TLDR</a></li>
+<li><a href="#orged1dc57">1.2. The Boogeyman</a></li>
+<li><a href="#org5b1673f">1.3. Related Works &amp; Important Differences</a></li>
 </ul>
 </li>
-<li><a href="#org1876816">2. The Kernel</a>
+<li><a href="#org2fb0c0f">2. The Kernel</a>
 <ul>
-<li><a href="#orgfd79734">2.1. Communication</a></li>
-<li><a href="#org4dbe46e">2.2. Messages</a></li>
+<li><a href="#org44f20d9">2.1. Messages</a></li>
+<li><a href="#orga01262b">2.2. Communication</a></li>
 </ul>
 </li>
-<li><a href="#orge1f87a7">3. Transports</a>
+<li><a href="#org9392292">3. Transports</a>
 <ul>
-<li><a href="#orgc4d1f94">3.1. Abstractly</a></li>
-<li><a href="#org60c0c38">3.2. Concretely</a></li>
+<li><a href="#org83e265b">3.1. Abstractly</a></li>
+<li><a href="#orgeba1ed2">3.2. Concretely</a></li>
 </ul>
 </li>
-<li><a href="#org24328f2">4. Utilities</a></li>
+<li><a href="#orgd49c7a1">4. Utilities</a></li>
 </ul>
 </div>
 </div>
-<div id="outline-container-org4c766e0" class="outline-2">
-<h2 id="org4c766e0"><span class="section-number-2">1.</span> Introduction</h2>
+<div id="outline-container-org58d3f42" class="outline-2">
+<h2 id="org58d3f42"><span class="section-number-2">1.</span> Introduction</h2>
 <div class="outline-text-2" id="text-1">
 <p>
-This literate document contains the source code for the core of <a href="https://bassline.dev">Bassline</a> v2.
+This literate document contains the source code for the core of <a href="https://bassline.dev">Bassline</a> v2.5.
 </p>
 
 <p>
-It is designed to be hacked on and modified, so we encourage people to read this!
+It is designed to be hacked on and modified, so we encourage people to
+read this!
 </p>
 </div>
-<div id="outline-container-org29fe7f4" class="outline-3">
-<h3 id="org29fe7f4"><span class="section-number-3">1.1.</span> TLDR</h3>
+<div id="outline-container-org7451407" class="outline-3">
+<h3 id="org7451407"><span class="section-number-3">1.1.</span> TLDR</h3>
 <div class="outline-text-3" id="text-1-1">
 <p>
-Bassline is a built for partial information programming.
+Bassline is built to make distributed programming dramatically simpler,
+easier, and more flexible.
 </p>
 
 <p>
-Programs in Bassline work with incomplete messages. They build local understanding from what they already know while acting on new information.
+Specifically, at Bassline, we are most interested in how this
+simplifies decentralized distributed programming. An area that outside
+of blockchains or very specific protocols is relatively starved.
 </p>
 
 <p>
-Anything outside your local perspective is encountered through communication.
-When that communication yields information that matters, we observe it as a resource.
-We do not need a complete account of what it is, where it is, or how it produces what we receive.
+Bassline offers a programming / epistemic model that allows arbitrary
+programs &amp; devices to collaborate and interact in an insanely small
+package. It demands almost nothing from participants, is trivial to
+support, and thrives in truly hetergenous settings.
 </p>
 
 <p>
-Identity, location, provenance, timing, and order are therefore not taken as settled facts.
-They are local judgments made from partial information.
-Different participants may have different grounds for believing them, and that is good.
-</p>
-
-<p>
-The model never assumes a closed world, so growth uses the same mechanism as ordinary operation.
-New message shapes, participants, and behavior do not require a separate extensibility system, they arrive as more messages to interpret.
+This is possible by what we choose to omit from our "Bassline", not by
+what we include.
 </p>
 </div>
 </div>
+<div id="outline-container-orged1dc57" class="outline-3">
+<h3 id="orged1dc57"><span class="section-number-3">1.2.</span> The Boogeyman</h3>
+<div class="outline-text-3" id="text-1-2">
+
+<div id="org78cc49e" class="figure">
+<p><img src="./evangel.jpeg" alt="evangel.jpeg" width="500px" align="center" />
+</p>
 </div>
-<div id="outline-container-org1876816" class="outline-2">
-<h2 id="org1876816"><span class="section-number-2">2.</span> The Kernel</h2>
+
+<p>
+Distributed programming has the same reputation as a boogeyman. It's
+something that you check for under your bed at night. And it's
+decentralized cousin is described similarly to the devil or an eldritch
+horror.
+</p>
+
+<p>
+The church of k8s and the related devops sects preach the dangers of
+this "beast". They offer salvation through system images,
+microservices, monoliths, and more specifications. Yet none of these
+fully solve the problem.
+</p>
+
+<p>
+We don't believe distributed programming is a boogeyman, we think it's
+just misunderstood. The biggest misunderstanding, we believe, is the
+extreme cost uncontrolled proliferation of non-local ontology.
+</p>
+
+<p>
+In local programming we commonly build programs in terms of "things"
+and what they mean. It is an act of building a local ontology to
+express the program we want. But the issue is that when switching to a
+distributed setting, there are no "things". A distributed program is
+just a program running on a single machine that talks with the outside
+world via local affordances. There is no "message broker", there is
+locally received messages that I locally assign to be coming from a
+message broker.
+</p>
+
+<p>
+Bassline doesn't fight this, in fact we lean into it fully. We
+acknowledge that outside of our local programs, we can't know anything
+concrete, we can only observe messages. There is natural information
+asymmetry between "what I know currently" and "everything else".
+</p>
+
+<p>
+So rather than build from "things", we build from communcation, with
+the commitment being we do not build from things that aren't also
+available in the most extreme p2p setting you can imagine. The result
+is a system that is decentralized &amp; distributed by construction, yet
+totally ontologically sovereign.
+</p>
+</div>
+</div>
+<div id="outline-container-org5b1673f" class="outline-3">
+<h3 id="org5b1673f"><span class="section-number-3">1.3.</span> Related Works &amp; Important Differences</h3>
+<div class="outline-text-3" id="text-1-3">
+<p>
+This isn't the first system to focus on communication. But we believe
+we expand on some of the ideas in subtle but important ways.
+</p>
+
+<p>
+Things like the actor model, ocap systems, etc are much less
+"thing-oriented" than other systems. But they still make some global
+ontological commitments for the kind of shape the system has.
+</p>
+
+<p>
+The tricky thing is that these commitments to the system shape mandate
+their supporting constructs since the worldview &amp; model requires them.
+</p>
+</div>
+<div id="outline-container-orgdbaefc8" class="outline-4">
+<h4 id="orgdbaefc8"><span class="section-number-4">1.3.1.</span> <span class="todo TODO">TODO</span> Expand on the issues of blessed addressing &amp; identity</h4>
+<div class="outline-text-4" id="text-1-3-1">
+<ul class="org-ul">
+<li>Identity is a local judgement</li>
+<li>Addressing requires specific topologies &amp; protocols</li>
+<li>Bassline doesn't preclude addressing or identity, we just don't
+build it in the foundation, since it doesn't hold in all settings.</li>
+<li>This means that in Bassline you can use whatever you want / need,
+because we don't bless any kind of communication / connection.</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-org592dd86" class="outline-4">
+<h4 id="org592dd86"><span class="section-number-4">1.3.2.</span> <span class="todo TODO">TODO</span> Expand on the issues of symmetric communication</h4>
+<div class="outline-text-4" id="text-1-3-2">
+<ul class="org-ul">
+<li>The ability to receive information doesn't imply the ability to respond</li>
+<li>The ability to respond to something doesn't imply the ability to be receive</li>
+<li>These become more powerful when you have anonymous communication and
+no standard identity</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-orgf6a03f9" class="outline-4">
+<h4 id="orgf6a03f9"><span class="section-number-4">1.3.3.</span> <span class="todo TODO">TODO</span> Expand on the tyranny of names</h4>
+<div class="outline-text-4" id="text-1-3-3">
+<ul class="org-ul">
+<li>anonymous messages and caps gives us implicit / tacit apis</li>
+<li>Removes the concept of an "endpoint" because it's not there</li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-org2fb0c0f" class="outline-2">
+<h2 id="org2fb0c0f"><span class="section-number-2">2.</span> The Kernel</h2>
 <div class="outline-text-2" id="text-2">
 <p>
-The kernel starts with messages and a local capability for communication.
-In this book that capability is implemented with ports, a minimal set of capabilities for communication.
-Keep in mind the important thing is the ability to exchange and observe information, not any particular interface shape.
+The kernel starts with messages and local capabilities for
+communication. Keep in mind the important thing is the ability to
+exchange and observe information, not any particular interface shape.
 </p>
 
 <p>
-For each part of the kernel, we will separate the abstract idea from the concrete implementation used in this book.
-The abstract layer explains what shape of thing we are modeling.
-The concrete layer shows one minimal JavaScript realization of that shape.
+For each part of the kernel, we will separate the abstract idea from
+the concrete implementation used in this book.  The abstract layer
+explains what shape of thing we are modeling.  The concrete layer
+shows one minimal JavaScript realization of that shape.
 </p>
 </div>
-<div id="outline-container-orgfd79734" class="outline-3">
-<h3 id="orgfd79734"><span class="section-number-3">2.1.</span> Communication</h3>
+<div id="outline-container-org44f20d9" class="outline-3">
+<h3 id="org44f20d9"><span class="section-number-3">2.1.</span> Messages</h3>
 <div class="outline-text-3" id="text-2-1">
 </div>
-<div id="outline-container-org329dfa1" class="outline-4">
-<h4 id="org329dfa1"><span class="section-number-4">2.1.1.</span> Abstractly</h4>
+<div id="outline-container-orge8f1b71" class="outline-4">
+<h4 id="orge8f1b71"><span class="section-number-4">2.1.1.</span> Abstractly</h4>
 <div class="outline-text-4" id="text-2-1-1">
+<p>
+Messages are the most important concept in Bassline. So let's take a
+moment to define what a message really is.
+</p>
+
+<p>
+A message is:
+</p>
+<ul class="org-ul">
+<li>Data</li>
+<li>Anonymous</li>
+<li>Sovereign</li>
+<li>Portable and easy to share</li>
+<li>Free of "meta-data"</li>
+<li>Free of a priveledged meaning</li>
+</ul>
+
+<p>
+Let's expand on these
+</p>
+</div>
+<ol class="org-ol">
+<li><a id="org7b74f6a"></a>Messages are data<br />
+<div class="outline-text-5" id="text-2-1-1-1">
+<p>
+Messages are fundamentally data. They are values, and are easily
+shared over the wire, stored, etc.
+</p>
+
+<p>
+They do not have a declared schema other than being "dictionaries" at
+the top level.
+</p>
+
+<p>
+Because they are data and you are free to be replicated and shared as
+you wish.
+</p>
+</div>
+</li>
+<li><a id="org3944412"></a>Messages are anonymous<br />
+<div class="outline-text-5" id="text-2-1-1-2">
+<p>
+When we say a message is anonymous, it simply means we cannot address
+a message.
+</p>
+
+<p>
+A message can be bound to a name locally, giving us a way to refer to
+it. But that is a property of the binding, not of the message.
+</p>
+
+<p>
+You also might have a way of identifying a message such as an id or a
+hash. But this not fundamental to a message.
+</p>
+</div>
+</li>
+<li><a id="orgf417449"></a>Messages are sovereign<br />
+<div class="outline-text-5" id="text-2-1-1-3">
+<p>
+<b>This is an important point, so listen up!</b>
+</p>
+
+<p>
+Messages are ontologically sovereign. Meaning they have no special
+meaning other than the meaning you choose to assign to it.
+</p>
+
+<p>
+As such, when receiving a message that message is YOURS. It's
+"meaning" and what it entails is completely decided by you. A message
+can contain information to make this process easier, but a message
+doesn't have an absolutely true interpretation.
+</p>
+
+<p>
+This is why there is no "metadata" for a message. Because metadata
+blesses a canonical form of what is the "content" and what is "about
+the message". This violates the ontological sovereignty of a message.
+</p>
+
+<p>
+As such any "metadata" kind of things belong in the message directly
+like any other data. The "meta-ness" of the data is the choice of the
+receiver of the message.
+</p>
+</div>
+</li>
+<li><a id="org8132c6c"></a>Messages can have capabilities<br />
+<div class="outline-text-5" id="text-2-1-1-4">
+<p>
+When passing messages around individuals may choose to enrich a
+message with capabilities. A capability, or "cap" for short, is a
+uni-directional opaque function that can travel alongside the data of
+a message in-process.
+</p>
+
+<p>
+Conceptually, it gives the anonymous message an anonymous way to speak
+to something. Kinda like being handed a phone that's already on a
+call, but they are on mute.
+</p>
+
+<p>
+You can speak into it, they don't know who you are, since they dialed
+"not-you", nor do you know who they are. But you are connected through
+some chain of events that caused you to be able to speak with them.
+</p>
+</div>
+<ol class="org-ol">
+<li><a id="orgcdeaf4e"></a><span class="todo TODO">TODO</span> Update this prose to be better.<br />
+<div class="outline-text-6" id="text-2-1-1-4-1">
+<p>
+In order for this to work:
+</p>
+<ul class="org-ul">
+<li>capabilities must be ignorable</li>
+<li>capabilities must never return values directly, they should be
+opaque</li>
+<li>capabilities cannot travel over the wire, unless they are reified as data</li>
+</ul>
+</div>
+</li>
+</ol>
+</li>
+</ol>
+</div>
+<div id="outline-container-orgf1f0cb2" class="outline-4">
+<h4 id="orgf1f0cb2"><span class="section-number-4">2.1.2.</span> Concretely</h4>
+<div class="outline-text-4" id="text-2-1-2">
+<p>
+As we established in the abstract section, messages are the most
+important concept in bassline.
+</p>
+
+<p>
+It contains data as a dictionary with string keys, as well as a
+distinct space for capabilities in process.
+</p>
+
+<p>
+When serializing or transporting messages, only the data is kept, and
+caps must be reified as data in order to be mobile.
+</p>
+
+<p>
+This implementation isn't really special, and you could implement an
+alternative kind of Msg, but this works well and is very ergonomic
+compared to other approaches.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-js" id="org84930c5">const validCapName = invariants([[is.string, 'cap spelling must be a string']])
+const validCapFn = invariants([[is.fn, 'cap fn must be a function']])
+const validCaps = invariants([
+  [v =&gt; Object.keys(v).every(is.string), 'cap keys must be strings'],
+  [v =&gt; Object.values(v).every(is.fn), 'cap values must be functions']
+])
+const validData = invariants([
+  [is.object, 'data must be an object'],
+  [v =&gt; Object.keys(v).every(is.string)],
+  [v =&gt; !is.array(v), 'data cannot be an array']
+])
+
+export function msg(data = {}, caps = {}) {
+  if (is.msg(data)) return data.copy().grantAll(caps)
+  return new Msg(data, caps)
+}
+
+export class Msg {
+  data = {}
+  caps = new Map()
+  #controller = createController()
+
+  constructor(data = {}, caps = {}) {
+    validData(data)
+    validCaps(caps)
+    this
+      .merge(data)
+      .grantAll(caps)
+      .onClose(() =&gt; this.caps.clear())
+  }
+
+  // lifecycle
+  get ctl() {
+    return this.#controller.ctl
+  }
+
+  get close() {
+    return this.#controller.close
+  }
+
+  get closed() {
+    return this.ctl.closed
+  }
+
+  closes(...targets) {
+    this.ctl.closes(...targets)
+    return this
+  }
+
+  onClose(fn) {
+    this.ctl.onClose(fn)
+    return this
+  }
+
+  // data access
+  get(key) {
+    if(is.array(key)) {
+      return key.map(k =&gt; this.get(k))
+    }
+    return this.data[key]
+  }
+
+  delete(key) {
+    if(is.array(key)) {
+      key.forEach(k =&gt; this.delete(k))
+      return this
+    }
+    delete this.data[key]
+    return this
+  }
+
+  merge(data) {
+    this.data = { ...this.data, ...data }
+    return this
+  }
+
+  has(key) {
+    if(is.array(key)) {
+      return key.every(k =&gt; this.has(k))
+    }
+    return key in this.data
+  }
+
+  get keys() {
+    return Object.keys(this.data)
+  }
+
+  // cap access
+  hasCap(key) {
+    if(is.array(key)) {
+      return key.every(k =&gt; this.hasCap(k))
+    }
+    return this.caps.has(key)
+  }
+
+  revoke(spelling) {
+    if(is.array(spelling)) {
+      spelling.forEach(s =&gt; this.revoke(s))
+      return this
+    }
+    this.caps.delete(spelling)
+    return this
+  }
+
+  grant(spelling, fn) {
+    validCapName(spelling)
+    validCapFn(fn)
+    this.caps.set(spelling, fn)
+    return this
+  }
+
+  grantAll(obj) {
+    Object.entries(obj).forEach(([k, v]) =&gt; this.grant(k, v))
+    return this
+  }
+
+  shareCaps(aMsg) {
+    for (const [k, v] of this.caps) {
+      aMsg.grant(k, v)
+    }
+    return this
+  }
+
+  get capKeys() {
+    return Array.from(this.caps.keys())
+  }
+
+  // cap invocation
+  invoke(spelling, arg = new Msg()) {
+    validCapName(spelling)
+    const cap = this.caps.get(spelling)
+    if (cap) cap(arg)
+    return this
+  }
+
+  send(msg) {
+    return this.invoke('send', msg)
+  }
+
+  // manipulation
+  copy(data = {}) {
+    const aMsg = new Msg({ ...this.data, ...data })
+    this.shareCaps(aMsg)
+    return aMsg
+  }
+
+  eat(aMsg, eatData = true, eatCaps = true) {
+    if(eatData) this.merge(aMsg.data)
+    if(eatCaps) aMsg.shareCaps(this)
+    return this
+  }
+
+  do(fn) {
+    return fn(this)
+  }
+
+  map(fn) {
+    return fn(this.copy())
+  }
+
+  // predicate testing
+  conforms(description) {
+    return conforms(description)(this.data)
+  }
+}
+</pre>
+</div>
+</div>
+<ol class="org-ol">
+<li><a id="orgb270374"></a>Invariants<br />
+<div class="outline-text-5" id="text-2-1-2-1">
+<p>
+Messages have a couple invariants:
+</p>
+<ul class="org-ul">
+<li>Cap keys must be strings</li>
+<li>Cap values must be functions</li>
+<li>Data must be an object with string keys</li>
+</ul>
+
+<p>
+The rest is free form
+</p>
+</div>
+</li>
+<li><a id="orgd454cdd"></a>Lifecycle<br />
+<div class="outline-text-5" id="text-2-1-2-2">
+<p>
+Messages have their own lifecycle. This is managed by the
+<code>createController</code> construct we define.
+</p>
+
+<p>
+When a message is closed, it's caps are cleared.
+</p>
+
+<p>
+With the exception of <code>signal</code>, the message has the same interface as
+the return from createController.
+</p>
+</div>
+</li>
+<li><a id="org74c4189"></a>Data Access<br />
+<div class="outline-text-5" id="text-2-1-2-3">
+<p>
+Most of the access methods on the class are polymorphic.
+</p>
+
+<p>
+If passed a string, they will do a singular version of something.
+Otherwise if given an array, they will do it for each element of the array.
+</p>
+
+<p>
+When it makes sense, most operations try to return <code>this</code>, to allow for
+method chaining.
+</p>
+
+<p>
+We omit a <code>set</code> method on the message, so if you want to change the
+data, use <code>merge</code> which passes in an object, which is merged into the
+data. You can also use <code>copy</code> to do this for a freshly copied message.
+</p>
+</div>
+</li>
+<li><a id="org87d1cf0"></a>Cap Access<br />
+<div class="outline-text-5" id="text-2-1-2-4">
+<p>
+Similar to above, but caps are a flat map.
+</p>
+
+<p>
+<code>invoke</code> is a no-op when a message lacks a capability. This can be
+tested for if needed.
+</p>
+
+<p>
+The only "sugar" included in the message class is <code>.send</code>, which
+internally just uses <code>this.invoke('send', arg)</code>.
+</p>
+
+<p>
+The reason this gets a pass is because it's the most common operation
+we perform.
+</p>
+</div>
+</li>
+<li><a id="orgf174c05"></a>Manipulation<br />
+<div class="outline-text-5" id="text-2-1-2-5">
+<p>
+The message implementation exposes a <code>copy</code> method for when we want to
+copy a message. It performs a shallow copy of the data, and shares
+the caps of the copied message.
+</p>
+
+<p>
+The <code>copy</code> method also takes an optional argument of data to merge into
+the copy. Because most of the time when we copy, we are adding new
+data to the message.
+</p>
+
+<p>
+<b>IMPORTANT!</b> The resulting message has it's own lifecycle, meaning
+closing the source message, has no impact on the copy.
+</p>
+
+<p>
+In addition to this, we offer 2 helpful methods for misc message manipulation.
+</p>
+
+<ol class="org-ol">
+<li><p>
+<code>do(aFn)</code>
+</p>
+
+<p>
+Takes a function, and passes this directly as the sole argument,
+returning whatever the function returns.
+</p></li>
+
+<li><p>
+<code>map(aFn)</code>
+</p>
+
+<p>
+Similar to do, but passes a <code>copy</code> into the function so changes don't
+mutate this message.
+</p></li>
+</ol>
+</div>
+</li>
+</ol>
+</div>
+</div>
+<div id="outline-container-orga01262b" class="outline-3">
+<h3 id="orga01262b"><span class="section-number-3">2.2.</span> Communication</h3>
+<div class="outline-text-3" id="text-2-2">
+</div>
+<div id="outline-container-org1ee7e21" class="outline-4">
+<h4 id="org1ee7e21"><span class="section-number-4">2.2.1.</span> Abstractly</h4>
+<div class="outline-text-4" id="text-2-2-1">
 <p>
 Communication in Bassline is built from two primitives, <code>send</code> and <code>recv</code>.
 </p>
@@ -115,8 +680,8 @@ Communication in Bassline is built from two primitives, <code>send</code> and <c
 </p>
 
 <p>
-A &ldquo;send&rdquo; is an opaque function that allows us to communicate TO something.
-We don&rsquo;t know what we are talking to or if it heard us.
+A "send" is an opaque function that allows us to communicate TO something.
+We don't know what we are talking to or if it heard us.
 The only thing we know is that we can say something.
 </p></li>
 
@@ -125,289 +690,377 @@ The only thing we know is that we can say something.
 </p>
 
 <p>
-A <code>recv</code> is the opposite. It&rsquo;s an opaque function, granting us the ability to observe something locally.
-Like send it is opaque, just because we can observe something doesn&rsquo;t mean we know where it came from or what it is.
-All we know is that we see something we didn&rsquo;t before.
+A <code>recv</code> is the opposite. It's an opaque function, granting us the
+ability to observe something locally.  Like send it is opaque, just
+because we can observe something doesn't mean we know where it came
+from or what it is.  All we know is that we see something we didn't
+before.
 </p></li>
 </ol>
 
 <p>
-So long as these are opaque, it means our programs work in arbitrary environments because they never assumed anything about what they cannot locally see.
-</p>
-</div>
-</div>
-<div id="outline-container-org6683582" class="outline-4">
-<h4 id="org6683582"><span class="section-number-4">2.1.2.</span> Concretely</h4>
-<div class="outline-text-4" id="text-2-1-2">
-<p>
-In this book, communication is implemented with ports.
+So long as these are opaque, it means our programs work in arbitrary
+environments because they never assumed anything about what they
+cannot locally see.
 </p>
 
 <p>
-A port gives us the 2 capabilities discussed above, as well as a <code>close</code> capability:
+<b>IMPORTANT:</b> Why recv cannot be a capability
+</p>
+
+<p>
+In order for something to be a capability, it must be an opaque way of
+speaking. Because this is the most we can commit to in a distributed
+setting without leaking commitments that don't hold. As such, <code>recv</code> is
+not allowed to be a capability. I cannot give you a way of receiving a
+message because receiving a message is always through your local
+affordances. The only thing we can do in a distributed setting, is communicate
+ways of communicating through an existing medium.
+</p>
+</div>
+</div>
+<div id="outline-container-org2a521f1" class="outline-4">
+<h4 id="org2a521f1"><span class="section-number-4">2.2.2.</span> Concretely</h4>
+<div class="outline-text-4" id="text-2-2-2">
+<p>
+The communication constructs in Bassline are implemented as functions
+that return a tuple: <code>[message, locals]</code>
+</p>
+
+<p>
+The <code>message</code> returned from the tuple includes all caps for the
+primitive. Whereas locals, depending on the construct, is things that
+aren't capabilities, such as <code>recv</code> for ports, <code>to</code> for propagators, etc.
+</p>
+
+<p>
+The lifecycle of the communication construct is commonly tied to the
+message. So when <code>message</code> closes, the communication construct is shutdown.
+</p>
+
+<p>
+The fact that our communication constructs have a message represention
+with caps, it means they can be shared as messages for others to use,
+but you cannot send the <code>locals</code> as a message directly!
+</p>
+</div>
+<ol class="org-ol">
+<li><a id="org96ca51a"></a>Port<br />
+<div class="outline-text-5" id="text-2-2-2-1">
+<p>
+A port is a minimal surface that faithfully implements what we care
+about for communication.
+</p>
+
+<p>
+It's message has 2 caps:
 </p>
 
 <ol class="org-ol">
 <li><p>
-<code>send(msg) -&gt; void</code>
+<code>send</code>
 </p>
 
 <p>
-Which let&rsquo;s us send a message to something
+Which let's us send a message to the port
 </p></li>
 
 <li><p>
-<code>recv() -&gt; Promise&lt;msg&gt;</code>
+<code>close</code>
 </p>
 
 <p>
-Which let&rsquo;s us pull a message from a local buffer, blocking until one is available.
-</p></li>
-
-<li><p>
-<code>close() -&gt; void</code>
+<b>This is distinct from the <code>message.close()</code>!</b>
 </p>
 
 <p>
-To ignore any future messages, stopping communication from our end.
+This let's us explicitly shutdown the port, making sends no-ops.
+</p>
+
+<p>
+It's important to note that there is no builtin lifecycle
+propagation with ports. It's trivial to include, but is leaky to
+include. This is because knowing how to "send" to something,
+doesn't mean we know it's alive, or that they can communicate with
+us.
+</p>
+
+<p>
+Senders are not notified and their messages are dropped should they
+send to the closed port.  This ensures neither side requires
+knowledge of the other's state / status without the other side
+explicitly sharing this, maintaining the sovereignty of the caps.
+</p>
+
+<p>
+You should still communicate when you die though but we can't force you.
+"#messaging-in-my-grave"
 </p></li>
 </ol>
-
-<p>
-A port is a minimal surface that faithfully implements what we care about for communication.
-</p>
-
-<p>
-An important thing to note is that there is no builtin lifecycle propagation with ports.
-This is because closing a port is a local decision made when a participant decides they aren&rsquo;t interested anymore, or that the conversation is not useful to them anymore.
-</p>
-
-<p>
-Senders are not notified and their messages are dropped should they send to the closed port.
-This ensures neither side requires knowledge of the other&rsquo;s state / status without the other side explicitly sharing this.
-</p>
 </div>
 <ol class="org-ol">
-<li><a id="org4377c20"></a>Port implementation<br />
-<div class="outline-text-5" id="text-2-1-2-1">
+<li><a id="org4302f7f"></a>Port implementation<br />
+<div class="outline-text-6" id="text-2-2-2-1-1">
 <p>
 The port implementation is rather simple.
 </p>
 
 <p>
-It maintains a buffer for messages, and a queue of promises to resolve.
-We can give the buffer a fixed capacity, in which it will act as a sliding buffer, dropping the oldest messages.
-Or if we give it a capacity of 0, it will not buffer any messages, requiring a listener actively be waiting for a message, dropping all others.
+It maintains a buffer for messages, and a queue of promises to
+resolve. We can give the buffer a fixed capacity, in which it will
+act as a sliding buffer, dropping the oldest messages.  Or if we give
+it a capacity of 0, it will not buffer any messages, requiring a
+listener actively be waiting for a message, dropping all others.
 </p>
 
 <p>
-The only other thing to note is the local convenience of EOF.
+The only other thing to note is the EOF symbol. This symbol is sent
+through and used by local port consumers to indicate that the port
+closed.  It is not universal and will serialize over the wire
+meaningfully.  It only exists to make our lives simpler in js.  And it
+is trivial to build your own interpretation of what should signal EOF
+locally.
 </p>
 
 <p>
-EOF is a symbol sent through and used by local port consumers to indicate that the port closed.
-It is not universal and will serialize over the wire meaningfully.
-It only exists to make our lives simpler in js.
-And it is trivial to build your own interpretation of what should signal EOF locally.
-</p>
-
-<p>
-You cannot send EOF directly through a port, nor should you ever have to.
-It should only be created internally inside of a port to notify a local consumer we are closed.
+You cannot pass EOF directly through a port's <code>send</code>, nor should you ever have
+to. It should only be created internally inside of a port to notify a
+local consumer we are closed.
 </p>
 
 <div class="org-src-container">
 <pre class="src src-js">&lt;&lt;utils-omitted&gt;&gt;
-<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">function</span> port(<span style="color: #718CA1;">size</span> = <span style="color: #E27E8D;">Infinity</span>) {
-  <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">buffer</span> = [], <span style="color: #718CA1;">waiters</span> = []
-  <span style="color: #5EC4FF;">let</span> <span style="color: #718CA1;">closed</span> = <span style="color: #E27E8D;">false</span>
-  <span style="color: #5EC4FF;">function</span> <span style="color: #33CED8;">close</span>() {
-    closed = <span style="color: #E27E8D;">true</span>
-    <span style="color: #5EC4FF;">for</span> (<span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">w</span> <span style="color: #5EC4FF;">of</span> waiters) w(EOF)
-    waiters.length = <span style="color: #E27E8D; font-weight: bold;">0</span>
+&lt;&lt;message-impl&gt;&gt;
+export function port(size = Infinity) {
+  const buffer = [], waiters = []
+  const description = 'I am a port. I support buffered communication.'
+  const m = new Msg({description})
+  m.grantAll({
+      send: msg =&gt; {
+        if (is.eof(msg)) throw failure('Bassline EOF is reserved')
+        // resolve the promise if we have a waiter
+        if (waiters.length &gt; 0) return waiters.shift()(msg)
+        // drop a message if we are over capabity
+        if (buffer.length &gt;= size) buffer.shift()
+        // add the message to the buffer if we have capacity
+        if (size &gt; 0) buffer.push(msg)
+      },
+      close: m.close
+    })
+  m.onClose(() =&gt; {
+    for (const w of waiters) w(EOF)
+    waiters.length = 0
+  })
+  function recv() {
+    if (buffer.length &gt; 0) return Promise.resolve(buffer.shift())
+    if (m.closed) return Promise.resolve(EOF)
+    return new Promise(resolve =&gt; waiters.push(resolve))
   }
-  <span style="color: #5EC4FF;">function</span> <span style="color: #33CED8;">send</span>(<span style="color: #718CA1;">msg</span>) {
-    <span style="color: #5EC4FF;">if</span> (is.eof(msg)) <span style="color: #5EC4FF;">throw</span> <span style="color: #5EC4FF;">new</span> <span style="color: #a9a9a9; font-weight: bold;">Error</span>(<span style="color: #539AFC;">'Bassline EOF is reserved'</span>)
-    <span style="color: #5EC4FF;">if</span> (closed) <span style="color: #5EC4FF;">return</span>
-    <span style="color: #41505E; font-style: italic;">// </span><span style="color: #41505E; font-style: italic;">resolve the promise if we have a waiter</span>
-    <span style="color: #5EC4FF;">if</span> (waiters.length &gt; <span style="color: #E27E8D; font-weight: bold;">0</span>) <span style="color: #5EC4FF;">return</span> waiters.shift()(msg)
-    <span style="color: #41505E; font-style: italic;">// </span><span style="color: #41505E; font-style: italic;">drop a message if we are over capabity</span>
-    <span style="color: #5EC4FF;">if</span> (buffer.length &gt;= size) buffer.shift()
-    <span style="color: #41505E; font-style: italic;">// </span><span style="color: #41505E; font-style: italic;">add the message to the buffer if we have capacity</span>
-    <span style="color: #5EC4FF;">if</span> (size &gt; <span style="color: #E27E8D; font-weight: bold;">0</span>) buffer.push(msg)
-  }
-  <span style="color: #5EC4FF;">function</span> <span style="color: #33CED8;">recv</span>() {
-    <span style="color: #5EC4FF;">if</span> (buffer.length &gt; <span style="color: #E27E8D; font-weight: bold;">0</span>) <span style="color: #5EC4FF;">return</span> Promise.resolve(buffer.shift())
-    <span style="color: #5EC4FF;">if</span> (closed) <span style="color: #5EC4FF;">return</span> Promise.resolve(EOF)
-    <span style="color: #5EC4FF;">return</span> <span style="color: #5EC4FF;">new</span> <span style="color: #a9a9a9; font-weight: bold;">Promise</span>(resolve =&gt; waiters.push(resolve))
-  }
-  <span style="color: #5EC4FF;">return</span> { send, recv, close }
+  return [m, recv]
 }
 </pre>
 </div>
 </div>
 </li>
-<li><a id="orga89316a"></a>Port usage<br />
+</ol>
+</li>
+<li><a id="orged30fc9"></a>Propagator<br />
+<div class="outline-text-5" id="text-2-2-2-2">
+<p>
+A propagator let's us define something that can selectively propagate
+interesting messages to multiple targets.
+</p>
+
+<p>
+When constructing a propagator, you provide a propagation function,
+this takes 2 arguments: <code>aMsg</code> and <code>propagate</code>. Propagate simply forwards
+the value to the targets. This allows us to propagate multiple times
+per invocation.
+</p>
+
+<p>
+You can also use a propagator without forwarding as a reactive
+computation by just not calling propagate in the body.
+</p>
+
+<p>
+A propagator's message exposes the same caps as a port, making them
+behaviorally equivalent as messages. However unlike <code>port</code>, a propagator
+doesn't buffer. It eagerly does work.
+</p>
+
+<p>
+Cycles are supported and encouraged, just make sure you correctly
+setup your propagators to ignore irrelevant information.
+</p>
+
+<p>
+<b>NOTE: We might want to make <code>to</code> instead take messages rather than
+functions, it's probably cleaner since we can do lifecycle stuff.</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-js">export function propagator(fn = (v, p) =&gt; p(v)) {
+  const description = 'I am a propagator. I am a reactive inference machine.'
+  const m = new Msg({description})
+  const targets = new Set()
+  const propagate = value =&gt; targets.forEach(t =&gt; t(value))
+  m.onClose(() =&gt; targets.clear())
+
+  const to = (...dests) =&gt; {
+    dests.forEach(d =&gt; targets.add(d))
+    return () =&gt; dests.forEach(d =&gt; targets.delete(d))
+  }
+
+  m.grantAll({
+    send: val =&gt; {
+      Promise.resolve(fn(val, propagate))
+        .catch(e =&gt; {throw e})
+    },
+    close: m.close
+  })
+
+  return [m, to]
+}
+</pre>
+</div>
+</div>
+</li>
+<li><a id="org32d1bfc"></a>Cell<br />
+<div class="outline-text-5" id="text-2-2-2-3">
+<p>
+This is almost identical to <code>propagator</code>. The only difference is the
+function is a bit different, and it closes over some private state.
+</p>
+
+<p>
+The <code>merge</code> function takes 3 arguments:
+</p>
+
 <ol class="org-ol">
-<li><a id="org157785f"></a>Propagator<br />
-<div class="outline-text-6" id="text-2-1-2-2-1">
+<li><code>current</code>
+The current value of the state</li>
+<li><code>incoming</code>
+The received message</li>
+<li><code>update</code>
+A function that updates state and propagates the new value.</li>
+</ol>
+
 <p>
-A propagator let&rsquo;s us define something that can selectively propagate interesting messages to multiple targets.
+When building cells, it's best to ensure they are Associative,
+Commutative, and Idempotent. This let's any cell behave as a CRDT with caps!
 </p>
 
 <p>
-Cycles are supported and encouraged, just make sure you correctly setup your propagators to ignore irrelevant information.
-</p>
-
-<div class="org-src-container">
-<pre class="src src-js"><span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">function</span> propagator(<span style="color: #718CA1;">fn</span> = (<span style="color: #718CA1;">v</span>, <span style="color: #718CA1;">p</span>) =&gt; p(v)) {
-  <span style="color: #5EC4FF;">let</span> <span style="color: #718CA1;">closed</span> = <span style="color: #E27E8D;">false</span>
-  <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">targets</span> = lazy(() =&gt; <span style="color: #5EC4FF;">new</span> <span style="color: #a9a9a9; font-weight: bold;">Set</span>())
-  <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">propagate</span> = value =&gt; targets().forEach(t =&gt; t(value))
-  <span style="color: #5EC4FF;">function</span> <span style="color: #33CED8;">send</span>(<span style="color: #718CA1;">value</span>) {
-    <span style="color: #5EC4FF;">if</span>(closed) <span style="color: #5EC4FF;">return</span>
-    Promise.resolve(fn(value, propagate))
-  }
-  <span style="color: #5EC4FF;">function</span> <span style="color: #33CED8;">to</span>(...dests) {
-    dests.forEach(d =&gt; targets().add(d))
-    <span style="color: #5EC4FF;">return</span> () =&gt; dests.forEach(d =&gt; targets().<span style="color: #5EC4FF;">delete</span>(d))
-  }
-  <span style="color: #5EC4FF;">function</span> <span style="color: #33CED8;">close</span>() {
-    closed = <span style="color: #E27E8D;">true</span>
-    targets().clear()
-  }
-  <span style="color: #5EC4FF;">return</span> { send, to, close }
-}
-</pre>
-</div>
-</div>
-</li>
-<li><a id="org228e19a"></a>Cell<br />
-<div class="outline-text-6" id="text-2-1-2-2-2">
-<p>
-A propagator with state
+<b>NOTE: Probably want to make the state a message, but it's a wip</b>
 </p>
 
 <div class="org-src-container">
-<pre class="src src-js"><span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">function</span> cell(<span style="color: #718CA1;">merge</span>, <span style="color: #718CA1;">init</span>) {
-  <span style="color: #5EC4FF;">let</span> <span style="color: #718CA1;">current</span> = init
-  <span style="color: #5EC4FF;">const</span> {send, to, close} = propagator((incoming, propagate) =&gt; {
+<pre class="src src-js">export function cell(merge, init) {
+  const description = 'I am a cell. I am a propagator with state'
+  let current = init
+  const [m, to] = propagator((incoming, propagate) =&gt; {
     merge(current, incoming, value =&gt; {
       current = value
       propagate(value)
     })
   })
-  <span style="color: #5EC4FF;">return</span> { send, to, close, value: () =&gt; current }
+  m.merge({description})
+  return [m, {to, value: () =&gt; current}]
 }
 </pre>
 </div>
 </div>
 </li>
-<li><a id="orgd9a460b"></a>Consume<br />
-<div class="outline-text-6" id="text-2-1-2-2-3">
+<li><a id="org7e72a34"></a>Consume<br />
+<div class="outline-text-5" id="text-2-2-2-4">
 <p>
-The most common way to use a port, is inside of an endless async loop that exits when we recv EOF.
-</p>
-
-<p>
-We define a helper for this called <code>consume</code>. It let&rsquo;s us use a recv fn to manage the inputs for a propagator, as well
-as it&rsquo;s lifecycle.
+This is the most common way to use a port. It takes a <code>recv</code> function
+The most common way to use a port, is inside of an endless async loop
+that exits when we recv EOF. We define a helper for this called
+<code>consume</code>. It let's us use a recv fn to manage the inputs for a
+propagator, as well as it's lifecycle.
 </p>
 
 <div class="org-src-container">
-<pre class="src src-js"><span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">function</span> consume(<span style="color: #718CA1;">recv</span>, <span style="color: #718CA1;">callback</span>) {
-  <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">p</span> = propagator(callback)
-  <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">promise</span> = (<span style="color: #5EC4FF;">async</span> () =&gt; {
-    <span style="color: #5EC4FF;">while</span> (<span style="color: #E27E8D;">true</span>) {
-      <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">msg</span> = <span style="color: #5EC4FF;">await</span> recv()
-      <span style="color: #5EC4FF;">if</span> (is.eof(msg)) <span style="color: #5EC4FF;">break</span>
-      p.send(msg)
+<pre class="src src-js">export function consume(recv, callback) {
+  const description = `\
+I am a consumed port.
+Internally I am a propagator driven by a port's recv.`
+
+  const [prop, to] = propagator(callback)
+  prop.merge({description})
+
+  const promise = (async () =&gt; {
+    const closed = new Promise(resolve =&gt; prop.onClose(() =&gt; resolve(EOF)))
+    while (!prop.closed) {
+      const msg = await Promise.race([recv(), closed])
+      if (is.eof(msg)) break
+      prop.invoke('send', msg)
     }
-    p.close()
+    prop.close()
   })()
-  <span style="color: #5EC4FF;">return</span> { to: p.to, promise }
+
+  return [prop, {to, promise}]
 }
 </pre>
 </div>
 </div>
 </li>
-</ol>
-</li>
-<li><a id="orgc1f6c42"></a>Nets<br />
-<div class="outline-text-5" id="text-2-1-2-3">
+<li><a id="org6860882"></a>Nets<br />
+<div class="outline-text-5" id="text-2-2-2-5">
 <p>
-Current our ports look like &ldquo;point-to-point&rdquo; communication, however in Bassline we don&rsquo;t talk to &ldquo;something&rdquo;, we observe information from our perspective, and send through opaque handles.
+Current ports look like "point-to-point" communication, however in
+Bassline we don't talk to "something", we observe information from our
+perspective, and invoke caps through opaque handles. We can exploit
+this fact to build a <code>net</code>.
 </p>
 
 <p>
-This let&rsquo;s us do some neat things when it comes to communication.
+A <code>net</code> is a local structure that gives us ports backed by any number of
+things.  Meaning that we build a compound communication interface
+without the consumers or producers ever knowing directly, since it has
+the same caps as a port.
 </p>
 
 <p>
-For example, a common structure we use is a <code>net</code>.
-</p>
-
-<p>
-A <code>net</code> is a local structure that gives us ports backed by any number of things.
-Meaning that we build a compound communication interface without the consumers or producers ever knowing directly.
-They might be able to tell if they see more information, but they can never know for sure.
-</p>
-
-<p>
-This highlights that in bassline cooperating participants appear as a single participant, even if they are totally unaware of each other.
+This structure is a decent showcase that "participant" is a very loose
+term in Bassline.
 </p>
 
 <div class="org-src-container">
-<pre class="src src-js"><span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">function</span> net() {
-  <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">ports</span> = <span style="color: #5EC4FF;">new</span> <span style="color: #a9a9a9; font-weight: bold;">Set</span>()
-  <span style="color: #5EC4FF;">function</span> <span style="color: #33CED8;">join</span>(<span style="color: #718CA1;">size</span>) {
-    <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">fromNet</span> = port(size)
+<pre class="src src-js">export function net() {
+  const description = `\
+I am a net.
+I implement seamless multi-party communication.`
+  const ports = new Set()
+  const netm = new Msg({description})
+
+  netm.grantAll({
+    send: msg =&gt; ports.forEach(p =&gt; p.send(msg)),
+    close: netm.close
+  })
+
+  const join = size =&gt; {
+    const [fromNet, recv] = port(size)
+    const toNet = fromNet.copy().grant('send', msg =&gt; {
+      for (const p of ports) {
+        if (p === fromNet) continue
+        p.send(msg)
+      }
+    })
+
+    netm.closes(fromNet, toNet)
+    fromNet.closes(toNet)
+    toNet.closes(fromNet)
+
     ports.add(fromNet)
-     <span style="color: #5EC4FF;">return</span> {
-      recv: fromNet.recv,
-      send(msg) {
-        ports.forEach(p =&gt; p !== fromNet &amp;&amp; p.send(msg))
-      },
-      close() {
-        fromNet.close()
-        ports.<span style="color: #5EC4FF;">delete</span>(fromNet)
-      },
-    }
+    fromNet.onClose(() =&gt; ports.delete(fromNet))
+
+    return [toNet, recv]
   }
-  join.close = () =&gt; [...ports].forEach(p =&gt; p.close())
-  join.send = msg =&gt; [...ports].forEach(p =&gt; p.send(msg))
-  <span style="color: #5EC4FF;">return</span> join
-}
-</pre>
-</div>
-</div>
-</li>
-<li><a id="org69761ea"></a>Communication without input<br />
-<div class="outline-text-5" id="text-2-1-2-4">
-<p>
-Not all communication take input.
-</p>
 
-<p>
-A clock is an example of a one-sided communication participant, it can say things, but will never listen.
-</p>
-
-<p>
-It can be used with anything that wants a capability to receive information, and can be used for local chron jobs, scheduling, and similar things.
-</p>
-
-<div class="org-src-container">
-<pre class="src src-js"><span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">function</span> clock(<span style="color: #718CA1;">ms</span> = <span style="color: #E27E8D; font-weight: bold;">1000</span>, <span style="color: #718CA1;">eager</span> = <span style="color: #E27E8D;">true</span>) {
-  <span style="color: #5EC4FF;">const</span> {send, to, close} = propagator((_, p) =&gt; p({ts: Date.now()}))
-  <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">interval</span> = setInterval(send, ms)
-  <span style="color: #5EC4FF;">if</span>(eager) send({})
-  <span style="color: #5EC4FF;">return</span> {
-    to,
-    close: () =&gt; {
-      clearInterval(interval)
-      close()
-    },
-  }
+  return [netm, join]
 }
 </pre>
 </div>
@@ -416,416 +1069,349 @@ It can be used with anything that wants a capability to receive information, and
 </ol>
 </div>
 </div>
-<div id="outline-container-org4dbe46e" class="outline-3">
-<h3 id="org4dbe46e"><span class="section-number-3">2.2.</span> Messages</h3>
-<div class="outline-text-3" id="text-2-2">
 </div>
-<div id="outline-container-orge446fbd" class="outline-4">
-<h4 id="orge446fbd"><span class="section-number-4">2.2.1.</span> Abstractly</h4>
-<div class="outline-text-4" id="text-2-2-1">
-<p>
-A message is a fragment of partial information. It is whatever can be locally held, passed around, inspected, and combined without requiring a complete picture of the world.
-</p>
-
-<p>
-A message does not come with privileged meaning beyond what participants give it.
-If provenance, correlation, naming, coordination hints, or other structure matters, it lives in the message like any other data.
-Bassline does not want a separate metadata plane that is somehow more real than the information being exchanged.
-</p>
-
-<p>
-<b>Note: The following is a bit of new prose for messages i&rsquo;m testing</b>
-</p>
-
-<p>
-Messages are data, not &ldquo;code&rdquo;. They are inert unless interpreted and acted upon.
-Interpreting a message is the local act of &ldquo;binding&rdquo; the meaning of message to some local program execution.
-</p>
-
-<p>
-As such it doesn&rsquo;t violate our model of messaging &amp; communication, if there exists purely local capabilities bound by other local participants, traveling ALONGSIDE the data.
-</p>
-
-<p>
-This is equivalent to ports, we don&rsquo;t care who added these capabilities, but we can observe them and act on them locally.
-</p>
-
-<p>
-This isn&rsquo;t possible in all systems, but it&rsquo;s a useful pattern none the less.
-</p>
-
-<p>
-The constraints to make this &ldquo;work&rdquo; are:
-</p>
-<ul class="org-ul">
-<li>capabilities must be allowed to be ignored</li>
-<li>capabilities must never return values directly, they should be opaque</li>
-<li>capabilities shouldn&rsquo;t removed data from the message itself, they should only enrich it for those interested</li>
-<li>capabilities cannot travel over the wire, unless they are reified as a higher order message.</li>
-</ul>
-</div>
-</div>
-<div id="outline-container-orgcdbc523" class="outline-4">
-<h4 id="orgcdbc523"><span class="section-number-4">2.2.2.</span> Concretely</h4>
-<div class="outline-text-4" id="text-2-2-2">
-<p>
-A message is a plain object with string keys. It can be empty, partially filled, or nested inside other messages.
-</p>
-
-<p>
-The concrete representation is intentionally minimal. Plain objects are open-ended, nest naturally, and are easy to serialize, enrich, and inspect. That keeps the message lightweight and avoids forcing a closed protocol up front.
-</p>
-</div>
-</div>
-<div id="outline-container-org1d6b3b5" class="outline-4">
-<h4 id="org1d6b3b5"><span class="section-number-4">2.2.3.</span> Simple Messages</h4>
-<div class="outline-text-4" id="text-2-2-3">
-<p>
-<code>message()</code> normalizes its input into a message:
-</p>
-<ul class="org-ul">
-<li>plain objects pass through</li>
-<li><code>undefined</code> becomes <code>{}</code></li>
-<li><p>
-Anything else is wrapped as <code>{body: value}</code>.
-</p>
-
-<div class="org-src-container">
-<pre class="src src-js"><span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">function</span> message(<span style="color: #718CA1;">content</span>) {
-  <span style="color: #5EC4FF;">if</span> (is.<span style="color: #E27E8D;">undefined</span>(content)) <span style="color: #5EC4FF;">return</span> {}
-  <span style="color: #5EC4FF;">if</span> (is.msg(content)) <span style="color: #5EC4FF;">return</span> {...content}
-  <span style="color: #5EC4FF;">return</span> { body: content }
-}
-</pre>
-</div></li>
-</ul>
-</div>
-</div>
-<div id="outline-container-orgc738d12" class="outline-4">
-<h4 id="orgc738d12"><span class="section-number-4">2.2.4.</span> Messages with capabilities</h4>
-<div class="outline-text-4" id="text-2-2-4">
-<p>
-This is a reference implementation of a message with capabilities bound by another participant.
-</p>
-
-<p>
-The interesting things to note here are the this allows us to express how a local participant can act on a message, allowing us share a send with a message.
-</p>
-
-<p>
-This makes messages not just data, but data enhanced with associated behavior through an interaction surface.
-</p>
-
-<p>
-By closing over a function that hides our acceptance criteria, we bind a capability to behaviorally test a receiver without ever assuming that the outside world exists or is stable.
-</p>
-
-<p>
-For example, we can build TCP like acknowledgement flows. But what&rsquo;s interesting is that the receiver of the message, cannot know what the final destination / intent of the response will be.
-</p>
-
-<p>
-This asymmetry falls naturally out of the model we have, and is an extremely powerful tool for opaquely testing and validating how peers are behaving.
-</p>
-
-<p>
-Consider traditional &ldquo;challenge&rdquo; protocols. The person being challenged knows that they are being challenged as they are engaging in a shared common protocol.
-</p>
-
-<p>
-Whereas if messages carry capabilities, the recipient of a message only sees the capability along with the data, and they never know if the message is a &ldquo;test&rdquo;, as that&rsquo;s a private perspective only the capability provider knows.
-It also lets them add / remove / replace capabilities as they process and share the messages.
-</p>
-
-<div class="org-src-container">
-<pre class="src src-js"><span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">hasCap</span> = (msg, name) =&gt; is.defined(msg[name]) &amp;&amp; is.fn(msg[name])
-
-<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">function</span> offer(<span style="color: #718CA1;">handlers</span>) {
-  <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">syms</span> = Object.getOwnPropertySymbols(handlers)
-  <span style="color: #5EC4FF;">return</span> propagator((msg, propagate) =&gt; {
-    <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">enriched</span> = { ...msg }
-    <span style="color: #5EC4FF;">for</span> (<span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">sym</span> <span style="color: #5EC4FF;">of</span> syms) {
-      enriched[sym] = m =&gt; <span style="color: #5EC4FF;">void</span> <span style="color: #718CA1;">handlers</span>[sym](m)
-    }
-    propagate(enriched)
-  })
-}
-
-<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">function</span> accept(<span style="color: #718CA1;">handlers</span>) {
-  <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">syms</span> = Object.getOwnPropertySymbols(handlers)
-  <span style="color: #5EC4FF;">return</span> propagator(<span style="color: #5EC4FF;">async</span> (msg, propagate) =&gt; {
-    <span style="color: #5EC4FF;">for</span> (<span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">sym</span> <span style="color: #5EC4FF;">of</span> syms) {
-      <span style="color: #5EC4FF;">if</span> (hasCap(msg, sym)) <span style="color: #5EC4FF;">await</span> handlers[sym](msg, msg[sym])
-    }
-    propagate(msg)
-  })
-}
-</pre>
-</div>
-</div>
-</div>
-</div>
-</div>
-<div id="outline-container-orge1f87a7" class="outline-2">
-<h2 id="orge1f87a7"><span class="section-number-2">3.</span> Transports</h2>
+<div id="outline-container-org9392292" class="outline-2">
+<h2 id="org9392292"><span class="section-number-2">3.</span> Transports</h2>
 <div class="outline-text-2" id="text-3">
 <p>
-As above, it helps to separate the abstract role of a transport from the concrete transport used in this book.
+As above, it helps to separate the abstract role of a transport from
+the concrete transport used in this book.
 </p>
 </div>
-<div id="outline-container-orgc4d1f94" class="outline-3">
-<h3 id="orgc4d1f94"><span class="section-number-3">3.1.</span> Abstractly</h3>
+<div id="outline-container-org83e265b" class="outline-3">
+<h3 id="org83e265b"><span class="section-number-3">3.1.</span> Abstractly</h3>
 <div class="outline-text-3" id="text-3-1">
 <p>
-A transport adapts some external medium into local communication capabilities. This matters because the programming model should not change just because information crossed a process boundary, a machine boundary, or a device boundary. Local and non-local communication differ in mechanics, but they should not require different conceptual tools.
+A transport adapts some external medium into local communication
+capabilities. This matters because the programming model should not
+change just because information crossed a process boundary, a machine
+boundary, or a device boundary. Local and non-local communication
+differ in mechanics, but they should not require different conceptual
+tools.
 </p>
 </div>
 </div>
-<div id="outline-container-org60c0c38" class="outline-3">
-<h3 id="org60c0c38"><span class="section-number-3">3.2.</span> Concretely</h3>
+<div id="outline-container-orgeba1ed2" class="outline-3">
+<h3 id="orgeba1ed2"><span class="section-number-3">3.2.</span> Concretely</h3>
 <div class="outline-text-3" id="text-3-2">
 <p>
-Every transport produces the same thing: a port with <code>send</code>, <code>recv</code>, and <code>close</code>. What differs is the medium underneath and whether that medium carries raw bytes or discrete messages.
+Every transport produces the same thing as ports do. They produce a message with
+<code>send</code> and <code>close</code> caps. And a local <code>recv</code> function.
 </p>
 
 <p>
-Byte transports (TCP sockets, stdio, serial) carry raw chunks. They need a framing layer to delimit and parse messages. Message transports (WebSocket, WebWorker/MessagePort) carry discrete messages natively and skip framing entirely.
+The only difference is the medium underneath and whether that
+medium carries raw bytes or discrete messages.
+</p>
+
+<p>
+Byte transports (TCP sockets, stdio, serial) carry raw chunks. They
+need a framing layer to delimit and parse messages. Message transports
+(WebSocket, WebWorker/MessagePort) carry discrete messages natively
+and skip framing entirely.
 </p>
 </div>
-<div id="outline-container-org68a9a95" class="outline-4">
-<h4 id="org68a9a95"><span class="section-number-4">3.2.1.</span> Framing</h4>
+<div id="outline-container-org13b3735" class="outline-4">
+<h4 id="org13b3735"><span class="section-number-4">3.2.1.</span> Framing</h4>
 <div class="outline-text-4" id="text-3-2-1">
 <p>
-Framing is separated from any specific transport. <code>readFrame</code> bridges a byte-level <code>recv</code> to a message-level <code>send</code>: it consumes chunks, accumulates them in a buffer, splits on newlines, and emits parsed messages. <code>format</code> is a plain function that serializes a message as a JSON line.
+Framing is separated from any specific transport.
+</p>
+
+<p>
+The <code>reader</code> propagator builds a propagator expecting messages with data
+matching: <code>{scalar: string}</code>. It will parse those strings into a buffer,
+propagating messages it parses without issue.
+On error, we simply console.warn for now. Though this can be replaced.
+One input chunk may produce zero or many messages.
+</p>
+
+<p>
+<code>format</code> is a stateless function that serializes a message as a JSON line. This
+is used on the outgoing side to serialize before writing.
 </p>
 
 <div class="org-src-container">
-<pre class="src src-js"><span style="color: #5EC4FF;">import</span> { message, consume } from <span style="color: #539AFC;">'../bassline.js'</span>
+<pre class="src src-js">import { propagator, is, msg } from '../bassline.js'
 
-<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">function</span> readFrame(<span style="color: #718CA1;">recv</span>, <span style="color: #718CA1;">dest</span>) {
-  <span style="color: #5EC4FF;">let</span> <span style="color: #718CA1;">buffer</span> = <span style="color: #539AFC;">''</span>
-  <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">prop</span> = consume(recv, (chunk, send) =&gt; {
-    buffer += chunk
-    <span style="color: #5EC4FF;">let</span> <span style="color: #718CA1;">nl</span>
-    <span style="color: #5EC4FF;">while</span> ((nl = buffer.indexOf(<span style="color: #539AFC;">'\n'</span>)) !== -<span style="color: #E27E8D; font-weight: bold;">1</span>) {
-      <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">line</span> = buffer.slice(<span style="color: #E27E8D; font-weight: bold;">0</span>, nl)
-      buffer = buffer.slice(nl + <span style="color: #E27E8D; font-weight: bold;">1</span>)
-      <span style="color: #5EC4FF;">if</span> (!line) <span style="color: #5EC4FF;">continue</span>
-      <span style="color: #5EC4FF;">try</span> {
-        send(message(JSON.parse(line)))
-      } <span style="color: #5EC4FF;">catch</span> (e) {
-        console.error(<span style="color: #539AFC;">'readFrame parse error: '</span>, e)
+const description = `\
+I am a reader.
+I can be sent messages like {scalar: string}.
+I read messages into a buffer, parsed as JSONL values.
+I emit parsed messages.`
+
+const validChunk = m =&gt; m.conforms({scalar: is.string})
+
+export function reader() {
+  let buffer = ''
+  const [m, to] = propagator((aMsg, send) =&gt; {
+    if(!validChunk(aMsg)) return
+    buffer += aMsg.get('scalar')
+    let nl
+    while ((nl = buffer.indexOf('\n')) !== -1) {
+      const line = buffer.slice(0, nl)
+      buffer = buffer.slice(nl + 1)
+      if (!line) continue
+      try {
+        send(msg(JSON.parse(line)))
+      } catch (e) {
+        console.error('readFrame parse error: ', e)
       }
     }
   })
-  prop.to(dest)
-  <span style="color: #5EC4FF;">return</span> prop
+  m.merge({description})
+  return [m, to]
 }
 
-<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">format</span> = msg =&gt; JSON.stringify(msg) + <span style="color: #539AFC;">'\n'</span>
+export const format = aMsg =&gt; JSON.stringify(aMsg.data) + '\n'
 
-<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">default</span> { read: readFrame, format }
+export default { reader, format }
 </pre>
 </div>
-
-<p>
-<code>readFrame</code> fires off a <code>consume</code> loop in the background. One input chunk may produce zero or many messages. <code>format</code> is used on the outgoing side to serialize before writing.
-</p>
 </div>
 </div>
-<div id="outline-container-orgd9b6eed" class="outline-4">
-<h4 id="orgd9b6eed"><span class="section-number-4">3.2.2.</span> Socket</h4>
+<div id="outline-container-org3055621" class="outline-4">
+<h4 id="org3055621"><span class="section-number-4">3.2.2.</span> Socket</h4>
 <div class="outline-text-4" id="text-3-2-2">
 <p>
-A socket is a byte transport. <code>fromSocket</code> creates a raw port for byte chunks, a message port for parsed messages, and bridges them through <code>frame.read</code>. Outgoing messages are formatted and written directly to the socket.
+A socket is a byte transport. <code>fromSocket</code> creates a raw port for byte
+chunks, a message port for parsed messages, and bridges them through
+<code>frame.read</code>. Outgoing messages are formatted and written directly to
+the socket.
 </p>
 
 <div class="org-src-container">
-<pre class="src src-js"><span style="color: #5EC4FF;">import</span> net from <span style="color: #539AFC;">'node:net'</span>
-<span style="color: #5EC4FF;">import</span> { port } from <span style="color: #539AFC;">'../bassline.js'</span>
-<span style="color: #5EC4FF;">import</span> defaultFrame from <span style="color: #539AFC;">'../frame/jsonl.js'</span>
+<pre class="src src-js">import net from 'node:net'
+import { msg, port } from '../bassline.js'
+import defaultFrame from '../frame/jsonl.js'
 
-<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">function</span> fromSocket(<span style="color: #718CA1;">socket</span>, <span style="color: #718CA1;">frame</span> = <span style="color: #718CA1;">defaultFrame</span>) {
-  <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">raw</span> = port()
-  <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">msgs</span> = port()
+const description = `\
+I am a socket.
+I allow interactions with socket-like interfaces.
+Any messages I am sent, is forwarded over the wire as data,
+stripping it's caps.`
 
-  socket.on(<span style="color: #539AFC;">'data'</span>, chunk =&gt; raw.send(chunk.toString()))
-  socket.on(<span style="color: #539AFC;">'close'</span>, () =&gt; raw.close())
-  socket.on(<span style="color: #539AFC;">'error'</span>, () =&gt; raw.close())
+export function fromSocket(socket, frame = defaultFrame) {
+  const outgoing = msg({description}, {send, close})
+  const [reader, onRead] = frame.reader()
+  const [msgs, recv] = port()
+  onRead(m =&gt; msgs.send(m))
 
-  frame.read(raw.recv, msgs.send)
-
-  <span style="color: #5EC4FF;">return</span> {
-    recv: msgs.recv,
-    send: msg =&gt; socket.write(frame.format(msg)),
-    close: () =&gt; {
-      msgs.close()
-      raw.close()
-      socket.destroy()
-    },
+  function send(m) {
+    socket.write(frame.format(m))
   }
+  function close() {
+    outgoing.close()
+  }
+
+  outgoing.ctl.closes(reader, msgs)
+  outgoing.ctl.onClose(() =&gt; socket.destroy())
+
+  socket.on('data', chunk =&gt; reader.send(msg({scalar: chunk.toString()})))
+  socket.on('close', close)
+  socket.on('end', close)
+  socket.on('error', close)
+
+  return [outgoing, recv]
 }
 
-<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">function</span> connect(<span style="color: #718CA1;">options</span> = {}, <span style="color: #718CA1;">frame</span> = <span style="color: #718CA1;">defaultFrame</span>) {
-  <span style="color: #5EC4FF;">return</span> fromSocket(net.createConnection(options), frame)
+export function connect(options = {}, frame = defaultFrame) {
+  return fromSocket(net.createConnection(options), frame)
 }
 </pre>
 </div>
 </div>
 </div>
-<div id="outline-container-orgf0af520" class="outline-4">
-<h4 id="orgf0af520"><span class="section-number-4">3.2.3.</span> Serving (TCP)</h4>
+<div id="outline-container-orgc325fca" class="outline-4">
+<h4 id="orgc325fca"><span class="section-number-4">3.2.3.</span> Serving (TCP)</h4>
 <div class="outline-text-4" id="text-3-2-3">
 <p>
-A TCP server listens on a socket and produces a port of connections. Each connection is itself a port, produced by <code>fromSocket</code>.
+A TCP server listens on a socket and produces a port of
+connections. Each connection is itself a port, produced by
+<code>fromSocket</code>.
 </p>
 
 <div class="org-src-container">
-<pre class="src src-js"><span style="color: #5EC4FF;">import</span> nodeNet from <span style="color: #539AFC;">'node:net'</span>
-<span style="color: #5EC4FF;">import</span> { fromSocket } from <span style="color: #539AFC;">'../transports/socket.js'</span>
-<span style="color: #5EC4FF;">import</span> { port } from <span style="color: #539AFC;">'../bassline.js'</span>
+<pre class="src src-js">import nodeNet from 'node:net'
+import { fromSocket } from '../transports/socket.js'
+import { msg } from '../bassline.js'
+import defaultFrame from '../frame/jsonl.js'
 
-<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">function</span> serve(<span style="color: #718CA1;">options</span> = {}, <span style="color: #718CA1;">frame</span>) {
-  <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">p</span> = port()
-  <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">server</span> = nodeNet.createServer(socket =&gt; {
-    p.send(fromSocket(socket, frame))
+const description = `\
+I am a server.
+I handle incoming connections as ports.`
+
+export function serve(onConnect, options = {}, frame = defaultFrame) {
+  const m = msg({description, options})
+
+  const server = nodeNet.createServer(socket =&gt; {
+    const [client, recv] = fromSocket(socket, frame)
+    m.closes(client)
+    onConnect([client, recv])
   })
+
+  m.closes(server)
   server.listen(options)
-  server.on(<span style="color: #539AFC;">'close'</span>, () =&gt; p.close())
-  server.on(<span style="color: #539AFC;">'error'</span>, () =&gt; p.close())
-  <span style="color: #5EC4FF;">return</span> {
-    recv: p.recv,
-    close: () =&gt; {
-      p.close()
-      server.close()
-    },
-    server,
-  }
+
+  m.grant('close', m.close)
+  server.on('close', m.close)
+  server.on('error', m.close)
+
+  return [m, server]
 }
 </pre>
 </div>
 </div>
 </div>
-<div id="outline-container-orgbc491eb" class="outline-4">
-<h4 id="orgbc491eb"><span class="section-number-4">3.2.4.</span> Serving (WebSocket)</h4>
+<div id="outline-container-org07d8e11" class="outline-4">
+<h4 id="org07d8e11"><span class="section-number-4">3.2.4.</span> Serving (WebSocket)</h4>
 <div class="outline-text-4" id="text-3-2-4">
 <p>
-A WebSocket server wraps an existing <code>WebSocketServer</code> instance and produces a port of connections, matching the TCP serve API shape. The caller brings their own <code>WebSocketServer</code> — no <code>ws</code> dependency in core.
+A WebSocket server wraps an existing <code>WebSocketServer</code> instance and
+produces a port of connections, matching the TCP serve API shape. The
+caller brings their own <code>WebSocketServer</code> — no <code>ws</code> dependency in
+core.
 </p>
 
 <div class="org-src-container">
-<pre class="src src-js"><span style="color: #5EC4FF;">import</span> { fromWebSocket } from <span style="color: #539AFC;">'../transports/websocket.js'</span>
-<span style="color: #5EC4FF;">import</span> { port } from <span style="color: #539AFC;">'../bassline.js'</span>
+<pre class="src src-js">import { fromWebSocket } from '../transports/websocket.js'
+import { msg } from '../bassline.js'
 
-<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">function</span> serve(<span style="color: #718CA1;">wss</span>) {
-  <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">p</span> = port()
-  wss.on(<span style="color: #539AFC;">'connection'</span>, ws =&gt; p.send(fromWebSocket(ws)))
-  wss.on(<span style="color: #539AFC;">'close'</span>, () =&gt; p.close())
-  wss.on(<span style="color: #539AFC;">'error'</span>, () =&gt; p.close())
-  <span style="color: #5EC4FF;">return</span> {
-    recv: p.recv,
-    close: () =&gt; {
-      p.close()
-      wss.close()
-    },
-    wss,
-  }
+const description = `\
+I am a web socket server.
+I behave similar to a normal server,
+but over web sockets. Go figure!`
+
+export function serve(wss, onConnect) {
+  const m = msg({description})
+  m.closes(wss)
+  wss.on('connection', ws =&gt; {
+    const [client, recv] = fromWebSocket(ws)
+    m.closes(client)
+    onConnect([client, recv])
+  })
+  m.grant('close', m.close)
+  wss.on('close', m.close)
+  wss.on('error', m.close)
+
+  return [m, wss]
 }
 </pre>
 </div>
 </div>
 </div>
-<div id="outline-container-org58b654a" class="outline-4">
-<h4 id="org58b654a"><span class="section-number-4">3.2.5.</span> WebSocket</h4>
+<div id="outline-container-org8a20458" class="outline-4">
+<h4 id="org8a20458"><span class="section-number-4">3.2.5.</span> WebSocket</h4>
 <div class="outline-text-4" id="text-3-2-5">
 <p>
-A WebSocket is a message transport. Each <code>ws.send()</code> is one discrete message, so no framing is needed. This works in the browser with native <code>WebSocket</code>, in Node.js with the <code>ws</code> package, and for <code>RTCDataChannel</code> since it has the same event interface.
+A WebSocket is a message transport. Each <code>ws.send()</code> is one discrete
+message, so no framing is needed. This works in the browser with
+native <code>WebSocket</code>, in Node.js with the <code>ws</code> package, and for
+<code>RTCDataChannel</code> since it has the same event interface.
 </p>
 
 <div class="org-src-container">
-<pre class="src src-js"><span style="color: #5EC4FF;">import</span> { port, message } from <span style="color: #539AFC;">'../bassline.js'</span>
+<pre class="src src-js">import { port, msg } from '../bassline.js'
 
-<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">function</span> fromWebSocket(<span style="color: #718CA1;">ws</span>) {
-  <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">p</span> = port()
-  ws.addEventListener(<span style="color: #539AFC;">'message'</span>, e =&gt; {
-    <span style="color: #5EC4FF;">try</span> {
-      p.send(message(JSON.parse(e.data)))
-    } <span style="color: #5EC4FF;">catch</span> (e) {
-      console.error(<span style="color: #539AFC;">'failed to parse: '</span>, e)
+const description = `I am a web socket.`
+
+export function fromWebSocket(ws) {
+  const outgoing = msg({description})
+  const [msgs, recv] = port()
+  ws.addEventListener('message', e =&gt; {
+    try {
+      msgs.send(msg(JSON.parse(e.data)))
+    } catch (e) {
+      console.error('failed to parse: ', e)
     }
   })
-  ws.addEventListener(<span style="color: #539AFC;">'close'</span>, () =&gt; p.close())
-  ws.addEventListener(<span style="color: #539AFC;">'error'</span>, () =&gt; p.close())
 
-  <span style="color: #5EC4FF;">return</span> {
-    recv: p.recv,
-    send: msg =&gt; ws.send(JSON.stringify(msg)),
-    close: () =&gt; {
-      p.close()
-      ws.close()
+  ws.addEventListener('close', outgoing.close)
+  ws.addEventListener('error', outgoing.close)
+
+  outgoing.grantAll({
+    send: m =&gt; {
+      const data = m.data
+      if(data) ws.send(JSON.stringify(data))
     },
-  }
+    close: outgoing.close,
+  })
+  outgoing.closes(msgs, ws)
+
+  return [outgoing, recv]
 }
 </pre>
 </div>
 </div>
 </div>
-<div id="outline-container-orgaea5436" class="outline-4">
-<h4 id="orgaea5436"><span class="section-number-4">3.2.6.</span> WebWorker</h4>
+<div id="outline-container-org1411cd9" class="outline-4">
+<h4 id="org1411cd9"><span class="section-number-4">3.2.6.</span> WebWorker</h4>
 <div class="outline-text-4" id="text-3-2-6">
 <p>
-A <code>MessagePort</code> is a message transport that uses structured clone. Objects cross the boundary without serialization. Works with <code>Worker</code>, <code>MessagePort</code>, <code>SharedWorker.port</code>, and <code>BroadcastChannel</code>.
+A <code>MessagePort</code> is a message transport that uses structured
+clone. Objects cross the boundary without serialization. Works with
+<code>Worker</code>, <code>MessagePort</code>, <code>SharedWorker.port</code>, and <code>BroadcastChannel</code>.
 </p>
 
 <div class="org-src-container">
-<pre class="src src-js"><span style="color: #5EC4FF;">import</span> { port, message } from <span style="color: #539AFC;">'../bassline.js'</span>
+<pre class="src src-js">import { msg, port } from '../bassline.js'
 
-<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">function</span> fromPort(<span style="color: #718CA1;">messagePort</span>) {
-  <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">p</span> = port()
-  messagePort.onmessage = e =&gt; p.send(message(e.data))
-  messagePort.onmessageerror = () =&gt; p.close()
+const description = 'I am a message port.'
+export function fromPort(messagePort) {
+  const outgoing = msg({description})
+  const [msgs, recv] = port()
+  messagePort.onmessage = e =&gt; msgs.send(msg(e.data))
+  messagePort.onmessageerror = () =&gt; outgoing.close()
 
-  <span style="color: #5EC4FF;">return</span> {
-    recv: p.recv,
-    send: msg =&gt; messagePort.postMessage(msg),
-    close: () =&gt; p.close(),
-  }
+  outgoing.closes(msgs, messagePort)
+
+  outgoing.grantAll({
+    send: m =&gt; {
+      const data = m.data
+      if(data) messagePort.postMessage(data)
+    },
+    close: outgoing.close
+  })
+  return [outgoing, recv]
 }
 </pre>
 </div>
 </div>
 </div>
-<div id="outline-container-org9031e62" class="outline-4">
-<h4 id="org9031e62"><span class="section-number-4">3.2.7.</span> Stdio</h4>
+<div id="outline-container-org9292113" class="outline-4">
+<h4 id="org9292113"><span class="section-number-4">3.2.7.</span> Stdio</h4>
 <div class="outline-text-4" id="text-3-2-7">
 <p>
-Stdio is a byte transport, like TCP, and uses framing internally to produce a port of messages.
+Stdio is a byte transport, like TCP, and uses framing internally to
+produce a port of messages.
 </p>
 
 <div class="org-src-container">
-<pre class="src src-js"><span style="color: #5EC4FF;">import</span> readline from <span style="color: #539AFC;">'node:readline'</span>
-<span style="color: #5EC4FF;">import</span> { port } from <span style="color: #539AFC;">'../bassline.js'</span>
-<span style="color: #5EC4FF;">import</span> defaultFrame from <span style="color: #539AFC;">'../frame/jsonl.js'</span>
+<pre class="src src-js">import readline from 'node:readline'
+import { port, msg } from '../bassline.js'
+import defaultFrame from '../frame/jsonl.js'
 
-<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">function</span> fromStdio(<span style="color: #718CA1;">frame</span> = <span style="color: #718CA1;">defaultFrame</span>) {
-  <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">raw</span> = port()
-  <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">msgs</span> = port()
-  <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">rl</span> = readline.createInterface({ input: process.stdin })
+const description = 'I am a stdio port'
 
-  rl.on(<span style="color: #539AFC;">'line'</span>, line =&gt; raw.send(line + <span style="color: #539AFC;">'\n'</span>))
-  rl.on(<span style="color: #539AFC;">'close'</span>, () =&gt; raw.close())
+export function fromStdio(frame = defaultFrame) {
+  const rl = readline.createInterface({ input: process.stdin })
 
-  frame.read(raw.recv, msgs.send)
+  const [reader, onRead] = frame.reader()
+  const [msgs, recv] = port()
 
-  <span style="color: #5EC4FF;">return</span> {
-    recv: msgs.recv,
-    send: msg =&gt; process.stdout.write(frame.format(msg)),
-    close: () =&gt; {
-      msgs.close()
-      raw.close()
-      rl.close()
-    },
-  }
+  onRead(v =&gt; msgs.send(v))
+
+  const outgoing = msg({description})
+    .grantAll({
+      send: m =&gt; process.stdout.write(frame.format(m)),
+      close: outgoing.close
+    })
+
+  outgoing.closes(msgs, rl, reader)
+
+  rl.on('line', line =&gt; reader.send(msg({scalar: line + '\n'})))
+  rl.on('close', () =&gt; outgoing.close())
+  return [outgoing, recv]
 }
 </pre>
 </div>
@@ -833,46 +1419,105 @@ Stdio is a byte transport, like TCP, and uses framing internally to produce a po
 </div>
 </div>
 </div>
-<div id="outline-container-org24328f2" class="outline-2">
-<h2 id="org24328f2"><span class="section-number-2">4.</span> Utilities</h2>
+<div id="outline-container-orgd49c7a1" class="outline-2">
+<h2 id="orgd49c7a1"><span class="section-number-2">4.</span> Utilities</h2>
 <div class="outline-text-2" id="text-4">
 <div class="org-src-container">
-<pre class="src src-js" id="orgba10a1c"><span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">EOF</span> = Symbol.<span style="color: #5EC4FF;">for</span>(<span style="color: #539AFC;">'$$BASSLINE_EOF$$'</span>)
-<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">function</span> kindOf(<span style="color: #718CA1;">v</span>) {
-  <span style="color: #5EC4FF;">if</span>(v === <span style="color: #E27E8D;">null</span>) <span style="color: #5EC4FF;">return</span> <span style="color: #539AFC;">'null'</span>
-  <span style="color: #5EC4FF;">if</span>(v === <span style="color: #E27E8D;">undefined</span>) <span style="color: #5EC4FF;">return</span> <span style="color: #539AFC;">'undefined'</span>
-  <span style="color: #5EC4FF;">if</span>(v <span style="color: #5EC4FF;">instanceof</span> <span style="color: #a9a9a9; font-weight: bold;">Promise</span>) <span style="color: #5EC4FF;">return</span> <span style="color: #539AFC;">'promise'</span>
-  <span style="color: #5EC4FF;">if</span>(Array.isArray(v)) <span style="color: #5EC4FF;">return</span> <span style="color: #539AFC;">'array'</span>
-  <span style="color: #5EC4FF;">return</span> <span style="color: #5EC4FF;">typeof</span> v
-}
+<pre class="src src-js" id="org39eaddf">export const EOF = Symbol.for("$$BASSLINE_EOF$$")
 
-<span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">isa</span> = kind =&gt; v =&gt; kindOf(v) === kind
-<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">is</span> = {
+const scalarTypes = ["string", "boolean", "symbol", "number"]
+export const is = {
   eof: v =&gt; v === EOF,
-  nil: v =&gt; v == <span style="color: #E27E8D;">null</span>,
-  <span style="color: #E27E8D;">null</span>: isa(<span style="color: #539AFC;">'null'</span>),
-  <span style="color: #E27E8D;">undefined</span>: isa(<span style="color: #539AFC;">'undefined'</span>),
-  defined: v =&gt; !(is.<span style="color: #E27E8D;">undefined</span>(v)),
-  promise: isa(<span style="color: #539AFC;">'promise'</span>),
-  number: isa(<span style="color: #539AFC;">'number'</span>),
-  string: isa(<span style="color: #539AFC;">'string'</span>),
-  fn: isa(<span style="color: #539AFC;">'function'</span>),
-  symbol: isa(<span style="color: #539AFC;">'symbol'</span>),
-  array: isa(<span style="color: #539AFC;">'array'</span>),
-  object: isa(<span style="color: #539AFC;">'object'</span>),
-  msg: v =&gt; is.object(v) &amp;&amp; Object.getPrototypeOf(v) === Object.<span style="color: #E27E8D;">prototype</span>
+  nil: v =&gt; v == null || Number.isNaN(v),
+  null: v =&gt; v === null,
+  undefined: v =&gt; v === undefined,
+  promise: v =&gt; v instanceof Promise,
+  boolean: v =&gt; typeof v === "boolean",
+  number: v =&gt; typeof v === "number" &amp;&amp; !Number.isNaN(v),
+  string: v =&gt; typeof v === "string",
+  fn: v =&gt; typeof v === "function",
+  symbol: v =&gt; typeof v === "symbol",
+  array: v =&gt; Array.isArray(v),
+  object: v =&gt; typeof v === "object" &amp;&amp; v !== null,
+  msg: v =&gt; v instanceof Msg,
+  scalar: v =&gt; is.null(v) || scalarTypes.includes(typeof v),
 }
 
-<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">lazy</span> = fn =&gt; {
-  <span style="color: #5EC4FF;">let</span> <span style="color: #718CA1;">value</span>, <span style="color: #718CA1;">called</span>;
-  <span style="color: #5EC4FF;">return</span> () =&gt; {
-    <span style="color: #5EC4FF;">if</span> (is.<span style="color: #E27E8D;">undefined</span>(called))
-      value = fn(), called = <span style="color: #E27E8D;">true</span>
-    <span style="color: #5EC4FF;">return</span> value
+export class AssertionFailure extends Error {}
+export function failure(msg) {
+  return new AssertionFailure(msg);
+}
+
+export function invariants(preds) {
+  function assert(value) {
+    for (const [pred, msg = (_v) =&gt; "assertion failed"] of preds) {
+      if (!pred(value)) {
+        if (is.fn(msg)) throw failure(msg(value))
+        throw failure(msg)
+      }
+    }
+    return value
   }
+  assert.test = (value) =&gt; {
+    try {
+      assert(value)
+      return true
+    } catch (e) {
+      if (e instanceof AssertionFailure) return false;
+      throw e
+    }
+  }
+  return assert
 }
 
-<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">delay</span> = (ms = <span style="color: #E27E8D; font-weight: bold;">1000</span>) =&gt; <span style="color: #5EC4FF;">new</span> <span style="color: #a9a9a9; font-weight: bold;">Promise</span>(res =&gt; setTimeout(res, ms))
+export const satisfiesAll = preds =&gt; val =&gt; preds.every(p =&gt; p(val))
+
+export function conforms(description) {
+  if (!is.object(description)) throw failure("conform: invalid description")
+
+  const predicates = [is.object];
+
+  for (const [key, val] of Object.entries(description)) {
+    if (is.fn(val)) {
+      predicates.push(obj =&gt; val(obj[key], obj));
+      continue;
+    }
+    if (is.scalar(val)) {
+      predicates.push(obj =&gt; obj[key] === val);
+      continue;
+    }
+    throw failure(`conform: unknown descriptor key: ${key}, val: ${val}`);
+  }
+
+  return satisfiesAll(predicates)
+}
+
+export function createController() {
+  const controller = new AbortController()
+  const signal = controller.signal
+  const ctl = {
+    onClose(fn, aSignal) {
+      if (ctl.closed) return void fn()
+      signal.addEventListener("abort", fn, { once: true, signal: aSignal })
+    },
+    closes(...controllers) {
+      for (const c of controllers) {
+        ctl.onClose(() =&gt; c.close(), c?.ctl?.signal)
+      }
+    },
+    get closed() {
+      return signal.aborted
+    },
+    signal,
+  }
+  function close(reason = "closed") {
+    if (ctl.closed) return
+    controller.abort(reason)
+  }
+  return { close, ctl }
+}
+
+export const delay = (ms = 1000) =&gt; new Promise((res) =&gt; setTimeout(res, ms))
 </pre>
 </div>
 
