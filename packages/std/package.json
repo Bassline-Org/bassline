@@ -4,13 +4,7 @@
   "description": "Standard Library for Bassline",
   "type": "module",
   "exports": {
-    "./data": "./src/data/index.js",
-    "./roles": "./src/roles/index.js",
-    "./message": "./src/message.js",
-    "./shape": "./src/shape.js",
-    "./caps": "./src/caps.js",
-    "./ns": "./src/ns.js",
-    "./cache": "./src/cache.js"
+    ".": "./src/index.js"
   },
   "scripts": {
     "test": "vitest run"

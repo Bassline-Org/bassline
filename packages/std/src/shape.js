@@ -11,7 +11,7 @@ export const invoke = spelling => {
   if (is.array(spelling)) {
     return Object.fromEntries(spelling.map(s => [s, invoke(s)]))
   }
-  return (aMsg, anotherMsg) => aMsg.invoke(spelling, anotherMsg)
+  return aMsg => anotherMsg => aMsg.invoke(spelling, anotherMsg)
 }
 
 export const { resolve, reject } = invoke(['resolve', 'reject'])
