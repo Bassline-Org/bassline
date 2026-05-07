@@ -1,0 +1,18 @@
+{
+  "name": "@bassline/eth-rpc",
+  "version": "0.0.1",
+  "description": "Ethereum RPC++ built with Bassline",
+  "type": "module",
+  "scripts": {
+    "build": "tsc"
+  },
+  "peerDependencies": {
+    "@bassline/core": "workspace:*",
+    "@bassline/std": "workspace:*"
+  },
+  "devDependencies": {
+    "@bassline/core": "workspace:*",
+    "@bassline/std": "workspace:*"
+  },
+  "license": "AGPL-3.0"
+}

@@ -2,3 +2,4 @@ packages:
   - apps/daemon
   - packages/core
   - packages/std
+  - packages/eth-rpc
