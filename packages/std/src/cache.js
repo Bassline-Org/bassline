@@ -1,5 +1,5 @@
 /**
- * @import {Recv} from "@bassline/core"
+ * @import {Send, Recv} from "@bassline/core"
  */
 import { is, invariants, Msg, propagator, consume } from '@bassline/core'
 
@@ -12,6 +12,11 @@ I also perform simple "routing".
 If you send to me with a {via: string} message,
 I will dispatch that to a parked cap (if it exists).`
 
+/**
+ *
+ * @param {string[]} ids
+ * @returns {string}
+ */
 const entryDescription = ids => `\
 I am a cached message.
 I am storing ${ids.length} caps.
@@ -33,6 +38,18 @@ export const isCommit = invariants([
   [m => m.has('capabilities'), 'no capability data'],
 ])
 
+/**
+ *
+ * @returns {[
+ * Msg<{description: string}, {send: Send}>,
+ * {
+ * onMsg: (...dests: Send<unknown>[]) => () => void
+ * dispatch: (aMsg: Msg) => Msg | undefined
+ * toData: (aMsg: Msg) => Msg | undefined
+ * entries: () => Msg[]
+ * }
+ * ]}
+ */
 export function createCache() {
   const byMsg = new Map()
   const byId = new Map()

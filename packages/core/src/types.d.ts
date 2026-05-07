@@ -53,9 +53,6 @@ export class Msg<D extends Data = {}, C extends Caps = {}> {
   get keys(): Array<keyof D>
   
   merge<T extends Data>(data: T): Msg<D & T, C>
-
-  
-
   // cap access
   hasCap(key: string): boolean
   hasCap(keys: readonly string[]): boolean
@@ -162,6 +159,8 @@ export function net<T = Msg>(): readonly [
 export const EOF: unique symbol
 
 type Shaped<T> = (value: unknown) => value is T
+type Scalar = string | number | null | symbol | boolean
+type Predicate<T = unknown> = (v: T) => boolean
 
 export const is: {
   eof: Shaped<typeof EOF>
@@ -177,7 +176,7 @@ export const is: {
   array: Shaped<readonly unknown[]>
   object: Shaped<object>
   msg: Shaped<Msg>
-  scalar: Shaped<string | boolean | symbol | number | null>
+  scalar: Shaped<Scalar>
 }
 
 export function delay(ms?: number): Promise<void>
@@ -185,16 +184,18 @@ export function delay(ms?: number): Promise<void>
 export class AssertionFailure extends Error {}
 export function failure(msg: string): AssertionFailure
 
-type Scalar = string | number | null | symbol | boolean
-type Predicate<T = unknown> = (v: T) => boolean
 type ConformDescription = Record<string, Scalar | Predicate>
 export function satisfiesAll(preds: Predicate[]): Predicate
-export function conforms<T extends Record<string, unknown>>(
-  description: ConformDescription
+export function conforms<T>(
+  description: {[K in string]: Predicate}
 ): Predicate<T>
+
 export function invariants<T = unknown>(
   preds: ReadonlyArray<
-    readonly [(v: T) => boolean, string | ((v: T) => string)]
+    readonly [
+      Predicate<T>,
+      string | ((v: T) => string)
+    ]
   >
 ): {
   (value: T): T

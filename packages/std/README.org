@@ -1,0 +1,79 @@
+#+title: Bassline Std
+
+* Bassline Std
+
+#+ATTR_HTML: :width 600px
+[[./docs/images/dog.jpg]]
+
+This is our "standard library" for Bassline. It's contains useful
+higher level tools / dialects for working with Bassline, all built
+from what =core= exposes.
+
+You can use this as a reference / cookbook for the kinds of things you
+can build with Bassline.
+
+* What's Included
+
+** A session / transport dialect
+
+Within =cache.js= we export =createCache=, =conversation=, and =dialogue=.
+
+These let us share messages with capabilities over the wire, letting
+us recognize and use remote capabilities and share local capabilities.
+
+=createCache= is the lowest level construct, and simply offers the raw
+mechanisms for turning data into caps, caps into data, and dispatching for caps.
+
+=conversation= allows us to build a participant that automatically
+reifies outgoing messages as data, and binds incoming messages. A
+conversation allows for sharing of a cache among multiple
+participants.
+
+=dialogue= is just like a conversation, however it's cache is scoped to
+a single participant. So once that participant closes, the caps are
+revoked and the cache is cleared. Dialogue hides it's cache internally
+and doesn't allow sharing of the same cache.
+
+** A proper lambda abstraction
+
+Within =lambda.js= we export =lambda=.
+
+=lambda= let's us convert any unary function into an invocable =LAMBDA=
+message.
+
+=lambda= properly handles curried functions and closures, wrapping any
+returned function as a =LAMBDA= message.
+
+=lambda= expects it's function to return either a function, message, or
+undefined, which it converts into an empty message.
+
+This let's us build any kind of RPC protocol, but supporting proper
+higher order functions rather than terminal data responses. It also
+let's us build "rpc" protocols that have closure over their
+interactions, reducing schema boilerplate.
+
+* Dialect Messages
+
+Within std we define a few kinds of messages and their expected cap
+behaviors.
+
+** REQUEST
+
+A =REQUEST= is a message with caps: =resolve= and =reject=.
+
+A =REQUEST= expresses the same semantics as JS Promises. Meaning resolve
+& reject are idempotent and whichever fires first resolves the
+promise.
+
+A =REQUEST= should be used to express a request with a discrete answer,
+as opposed to something with multiple potential answers.
+
+It can be thought of as a degenerate =send= that closes after a single response.
+
+** LAMBDA
+
+A =LAMBDA= is something with a cap =call=.
+
+A =LAMBDA= expresses semantics of a function that takes a =REQUEST= as
+input, and resolves with a message. The resolved message may itself be
+another =LAMBDA=, allowing us to express higher order functions as messages.

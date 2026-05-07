@@ -1,3 +1,10 @@
+/**
+ * @import { Msg, Send } from "@bassline/core"
+ */
+/**
+ * @typedef {Msg<unknown, {call: Send<Request>}>} Lambda
+ * @typedef {Msg<unknown, {resolve: Send, reject: Send}>} Request
+ */
 import { msg, is, failure } from '@bassline/core'
 const description = `\
 I am a lambda.
@@ -16,8 +23,16 @@ Anything else will reject the message.`
 const requiredCaps = ['resolve', 'reject']
 
 export function lambda(fn) {
+  /**
+   * @type {Msg<{description: string}, {call: Send}>}
+   */
   const message = msg({ description })
   message.grantAll({ call, close: message.close })
+  /**
+   *
+   * @param {Request} aMsg
+   * @returns {Promise<Msg>}
+   */
   async function call(aMsg) {
     if (!aMsg.hasCap(requiredCaps)) return
     // we do this to copy the resolve & reject caps for santiary reasons
@@ -50,6 +65,10 @@ export function lambda(fn) {
   return message
 }
 
+/**
+ * @param {Msg} aMsg
+ * @returns {readonly [Request, Promise<Msg>]}
+ */
 export function createPromise(aMsg = msg({})) {
   const resolver = aMsg
   const promise = new Promise((resolve, reject) => {
@@ -58,6 +77,9 @@ export function createPromise(aMsg = msg({})) {
   return [resolver, promise]
 }
 
+/**
+ * @type {<S extends string>(spelling: S) => (target: Msg<unknown, {[key in S]: Send<Request>}>) => (aMsg: Msg) => Promise<Msg>}
+ */
 export const request =
   spelling =>
   aTarget =>
@@ -74,6 +96,11 @@ export const request =
 
 export const call = request('call')
 
+/**
+ * @template {Msg} T
+ * @param {Lambda | Lambda[]} expr
+ * @returns {Promise<T>}
+ */
 export async function evaluate(expr) {
   if (is.msg(expr)) return expr
   if (!is.array(expr)) throw failure('evalute requires an array / msg for expr')
