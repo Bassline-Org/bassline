@@ -1,3 +1,4 @@
+// [[file:../../book/v2.org::*Stdio][Stdio:1]]
 import readline from 'node:readline'
 import { port, msg } from '../bassline.js'
 import defaultFrame from '../frame/jsonl.js'
@@ -23,3 +24,4 @@ export function fromStdio(frame = defaultFrame) {
   rl.on('close', () => outgoing.close())
   return [outgoing, recv]
 }
+// Stdio:1 ends here

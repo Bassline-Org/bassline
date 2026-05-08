@@ -1,9 +1,7 @@
 #+title: Bassline V2.5
 #+subtitle: I have no send but I must scream
 #+author: Goose
-#+property: header-args:js  :mkdirp yes :noweb yes
-#+property: header-args:js+ :results output
-#+OPTIONS: toc:2 num:t html-style:nil html-postamble:nil ^:nil
+#+OPTIONS: toc:2 html-style:nil html-postamble:nil ^:nil
 #+HTML_HEAD: <link rel="stylesheet" href="style.css"/>
 
 * Introduction
@@ -33,7 +31,7 @@ what we include.
 
 #+ATTR_HTML: :width 500px :align center
 #+ATTR_ORG: :align left
-[[./evangel.jpeg]]
+[[file:evangel.jpeg]]
 
 Distributed programming has the same reputation as a boogeyman. It's
 something that you check for under your bed at night. And it's
@@ -100,6 +98,9 @@ their supporting constructs since the worldview & model requires them.
 - Removes the concept of an "endpoint" because it's not there
 
 * The Kernel
+:PROPERTIES:
+:header-args: :tangle ../src/bassline.js :comments yes :padline yes
+:END:
 The kernel starts with messages and local capabilities for
 communication. Keep in mind the important thing is the ability to
 exchange and observe information, not any particular interface shape.
@@ -108,6 +109,139 @@ For each part of the kernel, we will separate the abstract idea from
 the concrete implementation used in this book.  The abstract layer
 explains what shape of thing we are modeling.  The concrete layer
 shows one minimal JavaScript realization of that shape.
+
+** Utilities
+
+*** Predicates
+
+#+BEGIN_SRC js
+  export const EOF = Symbol.for('$$BASSLINE_EOF$$')
+
+  export const is = {
+    eof: v => v === EOF,
+    null: v => v === null,
+    undefined: v => v === undefined,
+
+    number: v => typeof v === 'number' && !is.nan(v),
+    string: v => typeof v === 'string',
+    boolean: v => typeof v === 'boolean',
+    symbol: v => typeof v === 'symbol',
+    fn: v => typeof v === 'function',
+
+    nan: v => Number.isNaN(v),
+    array: v => Array.isArray(v),
+    arrayOf: pred => v => is.array(v) && v.every(pred),
+    promise: v => v instanceof Promise,
+    msg: v => v instanceof Msg,
+
+    nil: v => is.null(v) || is.undefined(v) || isNaN(v),
+    scalar: v => is.number(v) || is.string(v) || is.null(v) || is.boolean(v),
+    object: v => typeof v === 'object' && !is.null(v) && !is.array(v),
+  }
+#+END_SRC
+
+*** Object Manipulation
+
+#+BEGIN_SRC js
+  function get(obj, keys) {
+    if (is.undefined(obj)) return []
+    else if (is.array(keys)) keys.forEach(k => obj?.[k])
+    else if (is.string(keys)) obj?.[keys]
+    else throw failure('get: keys must be a string or an array of strings')
+    return obj
+  }
+
+  function has(obj, keys) {
+    if (is.undefined(obj)) return false
+    if (is.array(keys)) return keys.every(k => has(obj, k))
+    if (is.string(keys)) return Object.hasOwn(this.data, keys)
+    throw failure('has: keys must be a string or an array of strings')
+  }
+
+  function remove(obj, keys) {
+    if (is.undefined(obj)) return {}
+    if (is.array(keys)) keys.forEach(k => delete obj?.[k])
+    else if (is.string(keys)) delete obj?.[keys]
+    else throw failure('remove: keys must be a string or an array of strings')
+    return obj
+  }
+
+  function merge(obj, data) {
+    if (is.undefined(obj)) return merge({}, data)
+    if (is.undefined(data)) return obj
+    if (!is.object(data)) throw failure('data must be an object')
+    for (const [k, v] of Object.entries(data)) obj[k] = v
+    return obj
+  }
+
+  function defaults(obj, data) {
+    if (is.undefined(obj)) return defaults({}, data)
+    if (!is.object(data)) throw failure('data must be an object')
+    for (const [k, v] of Object.entries(data)) {
+      if (is.undefined(obj[k])) obj[k] = v
+    }
+    return obj
+  }
+
+  function pick(obj, keys) {
+    if (is.undefined(obj)) return {}
+    if (is.array(keys)) {
+      return Object.fromEntries(keys.map(k => [k, obj[k]]))
+    } else if (is.string(keys)) return { [keys]: obj[keys] }
+    else throw failure('pick: keys must be a string or an array of strings')
+  }
+#+END_SRC
+
+*** Assertions
+#+begin_src js
+  export class AssertionFailure extends Error { }
+  /**
+   * @param {string} msg
+   */
+  export function failure(msg) {
+    return new AssertionFailure(msg)
+  }
+#+end_src
+
+*** Controller
+
+#+BEGIN_SRC js
+  export class Controller {
+    controller = new AbortController()
+    signal = this.controller.signal
+    close = (reason = 'closed') => {
+      if (!this.closed) {
+        this.controller.abort(reason)
+      }
+      return this
+    }
+    onClose(fn, aSignal) {
+      if (this.closed) void fn()
+      else
+        this.signal.addEventListener('abort', fn, { once: true, signal: aSignal })
+      return this
+    }
+    closeGroup(...controllers) {
+      this.closedBy(...controllers)
+      this.closes(...controllers)
+      return this
+    }
+    closedBy(...controllers) {
+      controllers.forEach(c => c.closes(this))
+      return this
+    }
+    closes(...controllers) {
+      for (const c of controllers) {
+        this.onClose(() => c.close(), c?.signal)
+      }
+      return this
+    }
+    get closed() {
+      return this.signal.aborted
+    }
+  }
+#+END_SRC
+
 ** Messages
 *** Abstractly
 
@@ -204,140 +338,68 @@ This implementation isn't really special, and you could implement an
 alternative kind of Msg, but this works well and is very ergonomic
 compared to other approaches.
 
-#+NAME: message-impl
 #+BEGIN_SRC js
-  const validCapName = invariants([[is.string, 'cap spelling must be a string']])
-  const validCapFn = invariants([[is.fn, 'cap fn must be a function']])
-  const validCaps = invariants([
-    [v => Object.keys(v).every(is.string), 'cap keys must be strings'],
-    [v => Object.values(v).every(is.fn), 'cap values must be functions']
-  ])
-  const validData = invariants([
-    [is.object, 'data must be an object'],
-    [v => Object.keys(v).every(is.string)],
-    [v => !is.array(v), 'data cannot be an array']
-  ])
-
-  export function msg(data = {}, caps = {}) {
-    if (is.msg(data)) return data.copy().grantAll(caps)
-    return new Msg(data, caps)
+  export function msg() {
+    return new Msg()
   }
 
-  export class Msg {
+  export class Msg extends Controller {
     data = {}
-    caps = new Map()
-    #controller = createController()
-
-    constructor(data = {}, caps = {}) {
-      validData(data)
-      validCaps(caps)
-      this
-        .merge(data)
-        .grantAll(caps)
-        .onClose(() => this.caps.clear())
-    }
-
-    // lifecycle
-    get ctl() {
-      return this.#controller.ctl
-    }
-
-    get close() {
-      return this.#controller.close
-    }
-
-    get closed() {
-      return this.ctl.closed
-    }
-
-    closes(...targets) {
-      this.ctl.closes(...targets)
-      return this
-    }
-
-    onClose(fn) {
-      this.ctl.onClose(fn)
-      return this
-    }
-
-    // data access
-    get(key) {
-      if(is.array(key)) {
-        return key.map(k => this.get(k))
-      }
-      return this.data[key]
-    }
-
-    delete(key) {
-      if(is.array(key)) {
-        key.forEach(k => this.delete(k))
-        return this
-      }
-      delete this.data[key]
-      return this
-    }
-
-    merge(data) {
-      this.data = { ...this.data, ...data }
-      return this
-    }
-
-    has(key) {
-      if(is.array(key)) {
-        return key.every(k => this.has(k))
-      }
-      return key in this.data
+    caps = {}
+    constructor() {
+      super()
+      this.onClose(() => {
+        this.delete(this.keys)
+        this.revokeCaps(this.capKeys)
+      })
     }
 
     get keys() {
       return Object.keys(this.data)
     }
 
-    // cap access
-    hasCap(key) {
-      if(is.array(key)) {
-        return key.every(k => this.hasCap(k))
-      }
-      return this.caps.has(key)
-    }
-
-    revoke(spelling) {
-      if(is.array(spelling)) {
-        spelling.forEach(s => this.revoke(s))
-        return this
-      }
-      this.caps.delete(spelling)
-      return this
-    }
-
-    grant(spelling, fn) {
-      validCapName(spelling)
-      validCapFn(fn)
-      this.caps.set(spelling, fn)
-      return this
-    }
-
-    grantAll(obj) {
-      Object.entries(obj).forEach(([k, v]) => this.grant(k, v))
-      return this
-    }
-
-    shareCaps(aMsg) {
-      for (const [k, v] of this.caps) {
-        aMsg.grant(k, v)
-      }
-      return this
-    }
-
     get capKeys() {
-      return Array.from(this.caps.keys())
+      return Object.keys(this.caps)
     }
 
-    // cap invocation
+    // pure access
+    get(keys) {
+      return get(this.data, keys)
+    }
+
+    has(keys) {
+      return has(this.data, keys)
+    }
+
+    pick(keys) {
+      return pick(this.data, keys)
+    }
+
+    // mutating methods
+    delete(keys) {
+      remove(this.data, keys)
+      return this
+    }
+
+    defaults(defaultsObj) {
+      defaults(this.data, defaultsObj)
+      return this
+    }
+
+    // @todo add proper msg polymorphism for the rest
+    merge(data) {
+      if (is.msg(data)) return this.merge(data.data)
+      merge(this.data, data)
+      return this
+    }
+
+    // pure cap methods
+    capableOf(keys) {
+      return has(this.caps, keys)
+    }
+
     invoke(spelling, arg = new Msg()) {
-      validCapName(spelling)
-      const cap = this.caps.get(spelling)
-      if (cap) cap(arg)
+      this.caps?.[spelling]?.(arg)
       return this
     }
 
@@ -345,17 +407,34 @@ compared to other approaches.
       return this.invoke('send', msg)
     }
 
-    // manipulation
-    copy(data = {}) {
-      const aMsg = new Msg({ ...this.data, ...data })
-      this.shareCaps(aMsg)
-      return aMsg
+    // mutating cap methods
+    revokeCaps(keys) {
+      remove(this.caps, keys)
+      return this
     }
 
-    eat(aMsg, eatData = true, eatCaps = true) {
-      if(eatData) this.merge(aMsg.data)
-      if(eatCaps) aMsg.shareCaps(this)
+    defaultCaps(defaultsObj) {
+      if (!Object.values(defaultsObj).every(is.fn)) {
+        throw failure('defaultCaps: requires all values to be a fn')
+      }
+      defaults(this.caps, defaultsObj)
       return this
+    }
+
+    grantCaps(caps) {
+      if (!Object.values(caps).every(is.fn)) {
+        throw failure('grantCaps: requires all values to be a fn')
+      }
+      merge(this.caps, caps)
+      return this
+    }
+
+    // message manipulation
+    copy(data = {}) {
+      return new Msg()
+        .defaults(this.data)
+        .defaultCaps(this.caps)
+        .merge(data)
     }
 
     do(fn) {
@@ -366,9 +445,9 @@ compared to other approaches.
       return fn(this.copy())
     }
 
-    // predicate testing
-    conforms(description) {
-      return conforms(description)(this.data)
+    // lifecycle
+    child() {
+      return new Msg().closedBy(this)
     }
   }
 #+END_SRC
@@ -445,9 +524,6 @@ In addition to this, we offer 2 helpful methods for misc message manipulation.
    mutate this message.
 
 ** Communication
-:PROPERTIES:
-:header-args: :tangle ../src/bassline.js
-:END:
 
 *** Abstractly
 
@@ -549,14 +625,20 @@ You cannot pass EOF directly through a port's =send=, nor should you ever have
 to. It should only be created internally inside of a port to notify a
 local consumer we are closed.
 
-#+begin_src js :noweb no-export
-  <<utils-omitted>>
-  <<message-impl>>
+#+begin_src js
   export function port(size = Infinity) {
-    const buffer = [], waiters = []
+    const buffer = [],
+      waiters = []
     const description = 'I am a port. I support buffered communication.'
-    const m = new Msg({description})
-    m.grantAll({
+    function recv() {
+      if (buffer.length > 0) return Promise.resolve(buffer.shift())
+      if (m.closed) return Promise.resolve(EOF)
+      return new Promise(resolve => waiters.push(resolve))
+    }
+    const m = new Msg()
+    m
+      .defaults({ description })
+      .grantCaps({
         send: msg => {
           if (is.eof(msg)) throw failure('Bassline EOF is reserved')
           // resolve the promise if we have a waiter
@@ -566,23 +648,17 @@ local consumer we are closed.
           // add the message to the buffer if we have capacity
           if (size > 0) buffer.push(msg)
         },
-        close: m.close
+        close: m.close,
       })
-    m.onClose(() => {
-      for (const w of waiters) w(EOF)
-      waiters.length = 0
-    })
-    function recv() {
-      if (buffer.length > 0) return Promise.resolve(buffer.shift())
-      if (m.closed) return Promise.resolve(EOF)
-      return new Promise(resolve => waiters.push(resolve))
-    }
+      .onClose(() => {
+        for (const w of waiters) w(EOF)
+        waiters.length = 0
+      })
     return [m, recv]
   }
 #+end_src
 
 **** Propagator
-
 A propagator let's us define something that can selectively propagate
 interesting messages to multiple targets.
 
@@ -607,23 +683,25 @@ functions, it's probably cleaner since we can do lifecycle stuff.*
 #+begin_src js
   export function propagator(fn = (v, p) => p(v)) {
     const description = 'I am a propagator. I am a reactive inference machine.'
-    const m = new Msg({description})
     const targets = new Set()
     const propagate = value => targets.forEach(t => t(value))
-    m.onClose(() => targets.clear())
-
     const to = (...dests) => {
       dests.forEach(d => targets.add(d))
       return () => dests.forEach(d => targets.delete(d))
     }
 
-    m.grantAll({
-      send: val => {
-        Promise.resolve(fn(val, propagate))
-          .catch(e => {throw e})
-      },
-      close: m.close
-    })
+    const m = new Msg()
+    m
+      .defaults({ description })
+      .grantCaps({
+        send: val => {
+          Promise.resolve(fn(val, propagate)).catch(e => {
+            throw e
+          })
+        },
+        close: m.close,
+      })
+      .onClose(() => targets.clear())
 
     return [m, to]
   }
@@ -658,13 +736,12 @@ Commutative, and Idempotent. This let's any cell behave as a CRDT with caps!
         propagate(value)
       })
     })
-    m.merge({description})
-    return [m, {to, value: () => current}]
+    m.merge({ description })
+    return [m, { to, value: () => current }]
   }
 #+end_src
 
 **** Consume
-
 This is the most common way to use a port. It takes a =recv= function
 The most common way to use a port, is inside of an endless async loop
 that exits when we recv EOF. We define a helper for this called
@@ -678,7 +755,7 @@ propagator, as well as it's lifecycle.
   Internally I am a propagator driven by a port's recv.`
 
     const [prop, to] = propagator(callback)
-    prop.merge({description})
+    prop.merge({ description })
 
     const promise = (async () => {
       const closed = new Promise(resolve => prop.onClose(() => resolve(EOF)))
@@ -690,11 +767,11 @@ propagator, as well as it's lifecycle.
       prop.close()
     })()
 
-    return [prop, {to, promise}]
+    return [prop, { to, promise }]
   }
 #+end_src
 
-**** Nets
+**** Net
 
 Current ports look like "point-to-point" communication, however in
 Bassline we don't talk to "something", we observe information from our
@@ -715,28 +792,29 @@ term in Bassline.
   I am a net.
   I implement seamless multi-party communication.`
     const ports = new Set()
-    const netm = new Msg({description})
+    const netm = new Msg()
 
-    netm.grantAll({
+    netm.defaults({ description }).grantCaps({
       send: msg => ports.forEach(p => p.send(msg)),
-      close: netm.close
+      close: netm.close,
     })
 
     const join = size => {
       const [fromNet, recv] = port(size)
-      const toNet = fromNet.copy().grant('send', msg => {
-        for (const p of ports) {
-          if (p === fromNet) continue
-          p.send(msg)
-        }
+      const toNet = fromNet.copy().grantCaps({
+        send: msg => {
+          for (const p of ports) {
+            if (p === fromNet) continue
+            p.send(msg)
+          }
+        },
       })
 
-      netm.closes(fromNet, toNet)
-      fromNet.closes(toNet)
-      toNet.closes(fromNet)
-
       ports.add(fromNet)
-      fromNet.onClose(() => ports.delete(fromNet))
+      fromNet
+        .closedBy(netm)
+        .closeGroup(toNet)
+        .onClose(() => ports.delete(fromNet))
 
       return [toNet, recv]
     }
@@ -773,7 +851,7 @@ and skip framing entirely.
 
 *** Framing
 :PROPERTIES:
-:header-args: :tangle ../src/frame/jsonl.js
+:header-args: :tangle ../src/frame/jsonl.js :comments yes :padline yes
 :END:
 
 Framing is separated from any specific transport.
@@ -796,26 +874,25 @@ is used on the outgoing side to serialize before writing.
   I read messages into a buffer, parsed as JSONL values.
   I emit parsed messages.`
 
-  const validChunk = m => m.conforms({scalar: is.string})
-
   export function reader() {
     let buffer = ''
     const [m, to] = propagator((aMsg, send) => {
-      if(!validChunk(aMsg)) return
-      buffer += aMsg.get('scalar')
+      const chunk = aMsg.get('scalar')
+      if (!is.string(chunk)) return
+      buffer += chunk
       let nl
       while ((nl = buffer.indexOf('\n')) !== -1) {
         const line = buffer.slice(0, nl)
         buffer = buffer.slice(nl + 1)
         if (!line) continue
         try {
-          send(msg(JSON.parse(line)))
+          send(msg().merge(JSON.parse(line)))
         } catch (e) {
           console.error('readFrame parse error: ', e)
         }
       }
     })
-    m.merge({description})
+    m.merge({ description })
     return [m, to]
   }
 
@@ -826,59 +903,61 @@ is used on the outgoing side to serialize before writing.
 
 *** Socket
 :PROPERTIES:
-:header-args: :tangle ../src/transports/socket.js
+:header-args: :tangle ../src/transports/socket.js :comments yes :padline yes
 :END:
-
 A socket is a byte transport. =fromSocket= creates a raw port for byte
 chunks, a message port for parsed messages, and bridges them through
 =frame.read=. Outgoing messages are formatted and written directly to
 the socket.
 
 #+begin_src js
-    import net from 'node:net'
-    import { msg, port } from '../bassline.js'
-    import defaultFrame from '../frame/jsonl.js'
+  import net from 'node:net'
+  import { msg, port } from '../bassline.js'
+  import defaultFrame from '../frame/jsonl.js'
 
-    const description = `\
-    I am a socket.
-    I allow interactions with socket-like interfaces.
-    Any messages I am sent, is forwarded over the wire as data,
-    stripping it's caps.`
+  const description = `\
+  I am a socket.
+  I allow interactions with socket-like interfaces.
+  Any messages I am sent, is forwarded over the wire as data,
+  stripping it's caps.`
 
-    export function fromSocket(socket, frame = defaultFrame) {
-      const outgoing = msg({description}, {send, close})
-      const [reader, onRead] = frame.reader()
-      const [msgs, recv] = port()
-      onRead(m => msgs.send(m))
+  export function fromSocket(socket, frame = defaultFrame) {
+    const outgoing = msg()
+      .merge({ description })
+      .grantCaps({
+        send: m => socket.write(frame.format(m)),
+        close: outgoing.close
+      })
 
-      function send(m) {
-        socket.write(frame.format(m))
-      }
-      function close() {
-        outgoing.close()
-      }
+    const [reader, onRead] = frame.reader()
+    const [msgs, recv] = port()
+    onRead(m => msgs.send(m))
 
-      outgoing.ctl.closes(reader, msgs)
-      outgoing.ctl.onClose(() => socket.destroy())
+    outgoing
+      .closes(reader, msgs)
+      .onClose(() => socket.destroy())
 
-      socket.on('data', chunk => reader.send(msg({scalar: chunk.toString()})))
-      socket.on('close', close)
-      socket.on('end', close)
-      socket.on('error', close)
+    socket.on('data', chunk =>
+      reader.send(
+        msg().merge({ scalar: chunk.toString() })
+      )
+    )
+    socket.on('close', outgoing.close)
+    socket.on('end', outgoing.close)
+    socket.on('error', outgoing.close)
 
-      return [outgoing, recv]
-    }
+    return [outgoing, recv]
+  }
 
-    export function connect(options = {}, frame = defaultFrame) {
-      return fromSocket(net.createConnection(options), frame)
-    }
+  export function connect(options = {}, frame = defaultFrame) {
+    return fromSocket(net.createConnection(options), frame)
+  }
 #+end_src
 
 *** Serving (TCP)
 :PROPERTIES:
-:header-args: :tangle ../src/serve/tcp.js
+:header-args: :tangle ../src/serve/tcp.js :comments yes :padline yes
 :END:
-
 A TCP server listens on a socket and produces a port of
 connections. Each connection is itself a port, produced by
 =fromSocket=.
@@ -894,18 +973,19 @@ connections. Each connection is itself a port, produced by
   I handle incoming connections as ports.`
 
   export function serve(onConnect, options = {}, frame = defaultFrame) {
-    const m = msg({description, options})
+    const m = msg().merge({ description, options })
 
     const server = nodeNet.createServer(socket => {
       const [client, recv] = fromSocket(socket, frame)
-      m.closes(client)
+      client.closedBy(m)
       onConnect([client, recv])
     })
 
-    m.closes(server)
-    server.listen(options)
+    m
+      .grantCaps({ close: m.close })
+      .closes(server)
 
-    m.grant('close', m.close)
+    server.listen(options)
     server.on('close', m.close)
     server.on('error', m.close)
 
@@ -915,9 +995,8 @@ connections. Each connection is itself a port, produced by
 
 *** Serving (WebSocket)
 :PROPERTIES:
-:header-args: :tangle ../src/serve/ws.js
+:header-args: :tangle ../src/serve/ws.js :comments yes :padline yes
 :END:
-
 A WebSocket server wraps an existing =WebSocketServer= instance and
 produces a port of connections, matching the TCP serve API shape. The
 caller brings their own =WebSocketServer= — no =ws= dependency in
@@ -933,14 +1012,17 @@ core.
   but over web sockets. Go figure!`
 
   export function serve(wss, onConnect) {
-    const m = msg({description})
-    m.closes(wss)
+    const m = msg()
+      .merge({ description })
+      .closes(wss)
+
     wss.on('connection', ws => {
       const [client, recv] = fromWebSocket(ws)
-      m.closes(client)
+      client.closedBy(m)
       onConnect([client, recv])
     })
-    m.grant('close', m.close)
+
+    m.grantCaps({ close: m.close })
     wss.on('close', m.close)
     wss.on('error', m.close)
 
@@ -949,26 +1031,24 @@ core.
 #+end_src
 
 *** WebSocket
-:PROPERTIES:
-:header-args: :tangle ../src/transports/websocket.js
-:END:
 
 A WebSocket is a message transport. Each =ws.send()= is one discrete
 message, so no framing is needed. This works in the browser with
 native =WebSocket=, in Node.js with the =ws= package, and for
 =RTCDataChannel= since it has the same event interface.
 
-#+begin_src js
+#+begin_src js :tangle ../src/transports/websocket.js :comments yes :padline yes
   import { port, msg } from '../bassline.js'
 
   const description = `I am a web socket.`
 
   export function fromWebSocket(ws) {
-    const outgoing = msg({description})
+    const outgoing = msg()
+      .merge({ description })
     const [msgs, recv] = port()
     ws.addEventListener('message', e => {
       try {
-        msgs.send(msg(JSON.parse(e.data)))
+        msgs.send(msg().merge(JSON.parse(e.data)))
       } catch (e) {
         console.error('failed to parse: ', e)
       }
@@ -977,60 +1057,47 @@ native =WebSocket=, in Node.js with the =ws= package, and for
     ws.addEventListener('close', outgoing.close)
     ws.addEventListener('error', outgoing.close)
 
-    outgoing.grantAll({
-      send: m => {
-        const data = m.data
-        if(data) ws.send(JSON.stringify(data))
-      },
-      close: outgoing.close,
-    })
-    outgoing.closes(msgs, ws)
+    outgoing
+      .closes(msgs, ws)
+      .grantCaps({
+        send: m => ws.send(JSON.stringify(m.data)),
+        close: outgoing.close,
+      })
 
     return [outgoing, recv]
   }
 #+end_src
 
 *** WebWorker
-:PROPERTIES:
-:header-args: :tangle ../src/transports/worker.js
-:END:
 
 A =MessagePort= is a message transport that uses structured
 clone. Objects cross the boundary without serialization. Works with
 =Worker=, =MessagePort=, =SharedWorker.port=, and =BroadcastChannel=.
 
-#+begin_src js
+#+begin_src js :tangle ../src/transports/worker.js :comments yes :padline yes
   import { msg, port } from '../bassline.js'
 
   const description = 'I am a message port.'
   export function fromPort(messagePort) {
-    const outgoing = msg({description})
+    const outgoing = msg().merge({ description })
     const [msgs, recv] = port()
-    messagePort.onmessage = e => msgs.send(msg(e.data))
-    messagePort.onmessageerror = () => outgoing.close()
+    messagePort.onmessage = e => msgs.send(msg().merge(e.data))
+    messagePort.onmessageerror = outgoing.close
 
-    outgoing.closes(msgs, messagePort)
-
-    outgoing.grantAll({
-      send: m => {
-        const data = m.data
-        if(data) messagePort.postMessage(data)
-      },
-      close: outgoing.close
+    outgoing.closes(msgs, messagePort).grantCaps({
+      send: m => messagePort.postMessage(m.data),
+      close: outgoing.close,
     })
     return [outgoing, recv]
   }
 #+end_src
 
 *** Stdio
-:PROPERTIES:
-:header-args: :tangle ../src/transports/stdio.js
-:END:
 
 Stdio is a byte transport, like TCP, and uses framing internally to
 produce a port of messages.
 
-#+begin_src js
+#+begin_src js :tangle ../src/transports/stdio.js :comments yes :padline yes
   import readline from 'node:readline'
   import { port, msg } from '../bassline.js'
   import defaultFrame from '../frame/jsonl.js'
@@ -1057,107 +1124,6 @@ produce a port of messages.
     rl.on('close', () => outgoing.close())
     return [outgoing, recv]
   }
-#+end_src
-
-* Utilities
-
-#+name: utils-omitted
-#+begin_src js
-  export const EOF = Symbol.for("$$BASSLINE_EOF$$")
-
-  const scalarTypes = ["string", "boolean", "symbol", "number"]
-  export const is = {
-    eof: v => v === EOF,
-    nil: v => v == null || Number.isNaN(v),
-    null: v => v === null,
-    undefined: v => v === undefined,
-    promise: v => v instanceof Promise,
-    boolean: v => typeof v === "boolean",
-    number: v => typeof v === "number" && !Number.isNaN(v),
-    string: v => typeof v === "string",
-    fn: v => typeof v === "function",
-    symbol: v => typeof v === "symbol",
-    array: v => Array.isArray(v),
-    object: v => typeof v === "object" && v !== null,
-    msg: v => v instanceof Msg,
-    scalar: v => is.null(v) || scalarTypes.includes(typeof v),
-  }
-
-  export class AssertionFailure extends Error {}
-  export function failure(msg) {
-    return new AssertionFailure(msg);
-  }
-
-  export function invariants(preds) {
-    function assert(value) {
-      for (const [pred, msg = (_v) => "assertion failed"] of preds) {
-        if (!pred(value)) {
-          if (is.fn(msg)) throw failure(msg(value))
-          throw failure(msg)
-        }
-      }
-      return value
-    }
-    assert.test = (value) => {
-      try {
-        assert(value)
-        return true
-      } catch (e) {
-        if (e instanceof AssertionFailure) return false;
-        throw e
-      }
-    }
-    return assert
-  }
-
-  export const satisfiesAll = preds => val => preds.every(p => p(val))
-
-  export function conforms(description) {
-    if (!is.object(description)) throw failure("conform: invalid description")
-
-    const predicates = [is.object];
-
-    for (const [key, val] of Object.entries(description)) {
-      if (is.fn(val)) {
-        predicates.push(obj => val(obj[key], obj));
-        continue;
-      }
-      if (is.scalar(val)) {
-        predicates.push(obj => obj[key] === val);
-        continue;
-      }
-      throw failure(`conform: unknown descriptor key: ${key}, val: ${val}`);
-    }
-
-    return satisfiesAll(predicates)
-  }
-
-  export function createController() {
-    const controller = new AbortController()
-    const signal = controller.signal
-    const ctl = {
-      onClose(fn, aSignal) {
-        if (ctl.closed) return void fn()
-        signal.addEventListener("abort", fn, { once: true, signal: aSignal })
-      },
-      closes(...controllers) {
-        for (const c of controllers) {
-          ctl.onClose(() => c.close(), c?.ctl?.signal)
-        }
-      },
-      get closed() {
-        return signal.aborted
-      },
-      signal,
-    }
-    function close(reason = "closed") {
-      if (ctl.closed) return
-      controller.abort(reason)
-    }
-    return { close, ctl }
-  }
-
-  export const delay = (ms = 1000) => new Promise((res) => setTimeout(res, ms))
 #+end_src
 
 #+BEGIN_EXPORT html
