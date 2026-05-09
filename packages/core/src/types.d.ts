@@ -95,7 +95,7 @@ export class Msg<
     Msg<D, C & K>
 
   invoke<K extends keyof C>(spelling: K, arg?: Parameters<C[K]>[0]): this
-  send(arg: Parameters<C['send']>[0]): this
+  send(arg: 'send' extends keyof C ? Parameters<C['send']>[0] : never): this
 
   copy<K extends MsgData>(data?: K):
     Msg<D & K, C>
