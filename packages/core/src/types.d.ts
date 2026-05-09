@@ -1,203 +1,143 @@
-/**
- * The data plane of a message. Plain string-keyed values.
- * Also the wire form when caps are reified.
- */
-export type RawMessage<T = unknown> = Record<string, unknown> & T
-
-export type Send<T = Msg> = (arg: T) => void
-export type Recv<T = Msg> = () => Promise<T | typeof EOF>
-export type Close = (reason?: string) => void
-
-export interface CacheLike {
-  storeCap(
-    msg: Msg<unknown, unknown>,
-    spelling: string,
-    send: Send<unknown>
-  ): unknown
-}
-
-export interface Ctl {
-  closed: boolean
-  signal: AbortSignal
-  onClose(fn: () => void, signal?: AbortSignal): void
-  closes(...controllers: Array<{ close: Close }>): void
-}
-export function createController(): { close: Close; ctl: Ctl }
-
-export type Data = Record<string, unknown>
-export type Caps = Record<string, Send<unknown>>
-export type CapMap<T> = Map<keyof T, T[keyof T]>
-
-export class Msg<D extends Data = {}, C extends Caps = {}> {
-  data: D
-  caps: Map<keyof C, C[keyof C]>
-
-  constructor(data?: D, caps?: C)
-
-   // lifecycle
-  ctl: Ctl
-  close: Close
-  get closed(): boolean
-  closes(...targets: { close: Close }[]): this
-  onClose(fn): this
-
-  //data access
-  get<K extends keyof D>(key: K): D[K]
-  get<K extends keyof D>(keys: K[]): Array<D[K]>
-
-  delete<K extends string>(key: K): Msg<Omit<D, K>, C>
-  delete<K extends string>(keys: K[]): Msg<Omit<D, K>, C>
-
-  has(key: string): boolean
-  has(keys: string[]): boolean
-  get keys(): Array<keyof D>
-  
-  merge<T extends Data>(data: T): Msg<D & T, C>
-  // cap access
-  hasCap(key: string): boolean
-  hasCap(keys: readonly string[]): boolean
-
-  revoke<K extends keyof C & string>(spelling: K): Msg<D, Omit<C, K>>
-  revoke<K extends keyof C & string>(spelling: K[]): Msg<D, Omit<C, K>>
-  
-  revoke(spelling: string): this
-
-  grant<K extends string, F extends Send>(
-    spelling: K,
-    fn: F
-  ): Msg<D, C & { [k in K]: F }>
-  grantAll<T extends Caps>(obj: T): Msg<D, C & T>
-  invoke<K extends keyof C>(spelling: K, arg?: Parameters<C[K]>[0]): this
-  invoke(spelling: string, arg?: unknown): this
-  send(msg?: unknown): this
-
-  // manipulation
-  copy<T extends Data>(data?: T): Msg<D & T, C>
-  map<T>(fn: (aMsg: this) => T): T
-  do<T>(fn: (aMsg: this) => T): T
-  shareWith<MD extends Data, MC extends Caps>(aMsg: Msg<MD, MC>): Msg<D & MD, C & MC>
-  eat<MD extends Data, MC extends Caps>(aMsg: Msg<MD, MC>): Msg<D & MD, C & MC>
-  // predicates
-  conforms(description: unknown): boolean
-}
-
-export function msg<D extends Data, C extends Caps>(
-  data?: D,
-  caps?: C
-): Msg<D, C>
-
-export function port<T = unknown>(
-  size?: number
-): readonly [
-  Msg<{ description: string }, { send: Send<T>; close: Close }>,
-  Recv<T>,
-]
-
-export type PropagateFn<In = Msg, Out = In> =
-  | ((value: In, propagate: Send<Out>) => void | Promise<void>)
-  | ((value: In) => void | Promise<void>)
-
-export function propagator<T = Msg>(): readonly [
-  Msg<{ description: string }, { send: Send<T>; close: Close }>,
-  (...dests: Send<T>[]) => () => void,
-]
-
-export function propagator<In = unknown, Out = In>(
-  fn: PropagateFn<In, Out>
-): readonly [
-  Msg<{ description: string }, { send: Send<In>; close: Close }>,
-  (...dests: Send<Out>[]) => () => void,
-]
-
-export type Merge<In, State> = (
-  current: State,
-  incoming: In,
-  propagate: (state: State) => void
-) => void
-
-export function cell<In = Msg, State = In>(
-  merge: Merge<In, State>,
-  init: State
-): readonly [
-  Msg<{ description: string }, { send: Send<In>; close: Close }>,
-  {
-    to: (...dests: Send<State>[]) => () => void
-    value: () => State
-  },
-]
-
-export function consume<T = Msg>(
-  recv: Recv<T>
-): readonly [
-  Msg<{ description: string }, { send: Send<T>; close: Close }>,
-  {
-    to: (...dests: Send<T>[]) => () => void
-    promise: Promise<void>
-  },
-]
-export function consume<In = Msg, Out = In>(
-  recv: Recv<In>,
-  callback: PropagateFn<In, Out>
-): readonly [
-  Msg<{ description: string }, { send: Send<In>; close: Close }>,
-  {
-    to: (...dests: Send<Out>[]) => () => void
-    promise: Promise<void>
-  },
-]
-
-export function net<T = Msg>(): readonly [
-  Msg<{ description: string }, { send: Send<T>; close: Close }>,
-  (
-    size?: number
-  ) => readonly [
-    Msg<{ description: string }, { send: Send<T>; close: Close }>,
-    Recv<T>,
-  ],
-]
-
 export const EOF: unique symbol
 
-type Shaped<T> = (value: unknown) => value is T
-type Scalar = string | number | null | symbol | boolean
-type Predicate<T = unknown> = (v: T) => boolean
-
+type Guard<T> = (value: unknown) => value is T
 export const is: {
-  eof: Shaped<typeof EOF>
-  nil: Shaped<null | undefined>
-  null: Shaped<null>
-  undefined: Shaped<undefined>
-  promise: Shaped<Promise<unknown>>
-  boolean: Shaped<boolean>
-  number: Shaped<number>
-  string: Shaped<string>
-  fn: Shaped<Function>
-  symbol: Shaped<symbol>
-  array: Shaped<readonly unknown[]>
-  object: Shaped<object>
-  msg: Shaped<Msg>
-  scalar: Shaped<Scalar>
-}
+  eof: Guard<typeof EOF>
+  null: Guard<null>
+  undefined: Guard<undefined>
 
-export function delay(ms?: number): Promise<void>
+  number: Guard<number>
+  string: Guard<string>
+  boolean: Guard<boolean>
+  symbol: Guard<symbol>
+  fn: Guard<Function>
+
+  nan: Guard<number>
+  array: Guard<unknown[]>
+  arrayOf: <T>(pred: Guard<T>) => Guard<T[]>
+  promise: Guard<unknown>
+  msg: Guard<Msg<any, any>>
+
+  nil: Guard<undefined | null>
+  scalar: Guard<number | string | null | boolean>
+  object: Guard<object>
+}
 
 export class AssertionFailure extends Error {}
 export function failure(msg: string): AssertionFailure
 
-type ConformDescription = Record<string, Scalar | Predicate>
-export function satisfiesAll(preds: Predicate[]): Predicate
-export function conforms<T>(
-  description: {[K in string]: Predicate}
-): Predicate<T>
+export class Controller {
+  controller: AbortController
+  signal: AbortController['signal']
+  get closed(): boolean
+  close: (reason?: string) => this
+  onClose(fn: () => void, aSignal?: AbortSignal): this
 
-export function invariants<T = unknown>(
-  preds: ReadonlyArray<
-    readonly [
-      Predicate<T>,
-      string | ((v: T) => string)
-    ]
-  >
-): {
-  (value: T): T
-  test(value: T): boolean
+  closeGroup(...controllers: Controller[]): this
+  closedBy(...controllers: Controller[]): this
+  closes(...controllers: Pick<Controller, 'close'>[]): this
 }
+
+export type MsgData = Record<string, unknown>
+export type MsgCaps = Record<string, AnySend>
+export type Caps<K extends PropertyKey> = Record<K, AnySend>
+export type WithCaps<C extends MsgCaps> = Msg<MsgData, C>
+export type Send<M extends Msg = Msg> = (msg: M) => void
+type AnySend = (msg: Msg<any, any>) => void
+export type MsgOf<S> = S extends Send<infer M> ? M : Msg
+
+type Elements<T> = T[keyof T]
+
+export class Msg<
+  D extends MsgData = MsgData,
+  C extends MsgCaps = MsgCaps
+> extends Controller {
+  data: D
+  caps: C
+
+  get keys(): ReadonlyArray<keyof D>
+  get capKeys(): ReadonlyArray<keyof C>
+
+  get<K extends keyof D>(key: K): D[K]
+  get<const K extends readonly (keyof D)[]>(keys: K):
+    { [I in keyof K]: D[K[I] & keyof D] }
+
+  has<K extends string>(key: K): this is Msg<D & Record<K, unknown>, C>
+  has<K extends string>(keys: readonly K[]):
+    this is Msg<D & Record<K, unknown>, C>
+
+  pick<K extends keyof D>(key: K): { [P in K]: D[P] }
+  pick<const K extends readonly (keyof D)[]>(keys: K):
+    { [P in K[number]]: D[P] }
+  
+  merge<K extends MsgData>(data: K):
+    Msg<D & K, C>
+  defaults<K extends MsgData>(data: K):
+    Msg<D & Omit<K, keyof D>, C>
+
+  delete<K extends keyof D>(key: K): Msg<Omit<D, K>, C>
+  delete<const K extends readonly (keyof D)[]>(keys: K):
+    Msg<Omit<D, K[number]>, C>
+  
+  capableOf<K extends string>(key: K):
+    this is Msg<D, C & Record<K, AnySend>>
+  capableOf<K extends string>(keys: ReadonlyArray<K>):
+    this is Msg<D, C & Record<K, AnySend>>
+
+  revokeCaps<K extends keyof C>(key: K): Msg<D, Omit<C, K>>
+  revokeCaps<const K extends readonly (keyof C)[]>(keys: K):
+    Msg<D, Omit<C, K[number]>>
+  
+  defaultCaps<K extends MsgCaps>(defaults: K):
+    Msg<D, C & Omit<K, keyof C>>
+
+  grantCaps<K extends MsgCaps>(caps: K):
+    Msg<D, C & K>
+
+  invoke<K extends keyof C>(spelling: K, arg?: Parameters<C[K]>[0]): this
+  send(arg: Parameters<C['send']>[0]): this
+
+  copy<K extends MsgData>(data?: K):
+    Msg<D & K, C>
+
+  do<T>(fn: (value: this) => T): T
+  map<T>(fn: (value: this) => T): T
+  child(): Msg
+}
+
+export type Recv<M extends Msg = Msg> = () => Promise<M | typeof EOF>
+export type PortLike<C extends MsgCaps = {}>
+  = Msg<{description: string}, Omit<Caps<'send'|'close'>, keyof C> & C>
+
+export function port(size?: number): [PortLike, Recv]
+
+export function propagator(): [PortLike, Fwd]
+export function propagator<I extends Msg, O extends Msg>(
+  fn: PropagateFn<I, O>
+): [ PortLike<{send: Send<I>}>, Fwd<O> ]
+
+export type Fwd<M extends Msg = Msg> = (...dests: Send<M>[]) => () => void
+export type PropagateFn<I extends Msg, O extends Msg> =
+  (value: I, send: Send<O>) => void
+
+export function cell<I extends Msg = Msg, State extends Msg = Msg>(
+  merge: MergeFn<I, State>,
+  init: State
+): [
+  PortLike<{send: Send<I>}>,
+  { value: () => State, to: Fwd<State>}
+]
+export type MergeFn<I extends Msg, S extends Msg> =
+  (incoming: I, current: S, send: Send<S>) => void
+
+export function consume<I extends Msg = Msg>(recv: Recv<I>):
+  [ PortLike, { to: Fwd<I>, promise: Promise<void>} ]
+export function consume<
+  I extends Msg = Msg,
+  O extends Msg = Msg>(recv: Recv<I>, callback: PropagateFn<I, O>):
+  [ PortLike, { to: Fwd<O>, promise: Promise<void> } ]
+
+export function net(): [
+  PortLike,
+  (size?: number) => [PortLike, Recv]
+]
