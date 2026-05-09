@@ -3,18 +3,28 @@
   "version": "2.1.0",
   "description": "Partial Information Programming",
   "type": "module",
-  "types": "src/types.d.ts",
+  "types": "src/bassline.d.ts",
   "exports": {
     ".": {
-      "types": "./src/types.d.ts",
-      "default": "./src/index.js"
+      "types": "./src/bassline.d.ts",
+      "default": "./src/bassline.js"
     },
-    "./node": "./src/node.js",
-    "./transports/socket": "./src/transports/socket.js",
-    "./transports/stdio": "./src/transports/stdio.js",
-    "./serve/tcp": "./src/serve/tcp.js",
-    "./serve/ws": "./src/serve/ws.js",
-    "./frame/jsonl": "./src/frame/jsonl.js"
+    "./serve": {
+      "types": "./src/serve/index.d.ts",
+      "default": "./src/serve/index.js"
+    },
+    "./transports": {
+      "types": "./src/transports/index.d.ts",
+      "default": "./src/transports/index.js"
+    },
+    "./transports/node": {
+      "types": "./src/transports/node.d.ts",
+      "default": "./src/transports/node.js"
+    },
+    "./frame": {
+      "types": "./src/frame/index.d.ts",
+      "default": "./src/frame/index.js"
+    }
   },
   "scripts": {
     "test": "vitest run"
