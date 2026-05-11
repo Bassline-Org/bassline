@@ -70,6 +70,7 @@ export class Msg<
   pick<const K extends readonly (keyof D)[]>(keys: K):
     { [P in K[number]]: D[P] }
   
+  merge<M extends Msg>(m: M): Msg<D & M['data'], C>
   merge<K extends MsgData>(data: K):
     Msg<D & K, C>
   defaults<K extends MsgData>(data: K):
@@ -91,7 +92,7 @@ export class Msg<
   defaultCaps<K extends MsgCaps>(defaults: K):
     Msg<D, C & Omit<K, keyof C>>
 
-  grantCaps<K extends MsgCaps>(caps: K):
+  grantCaps<K extends readonly MsgCaps>(caps: K):
     Msg<D, C & K>
 
   invoke<K extends keyof C>(spelling: K, arg?: Parameters<C[K]>[0]): this
@@ -104,6 +105,8 @@ export class Msg<
   map<T>(fn: (value: this) => T): T
   child(): Msg
 }
+
+export function msg(): Msg<{}, {}>
 
 export type Recv<M extends Msg = Msg> = () => Promise<M | typeof EOF>
 export type PortLike<C extends MsgCaps = {}>
