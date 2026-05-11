@@ -13,14 +13,15 @@ export function fromStdio(frame = defaultFrame) {
 
   onRead(v => msgs.send(v))
 
-  const outgoing = msg({ description }).grantAll({
-    send: m => process.stdout.write(frame.format(m)),
-    close: outgoing.close,
-  })
+  const outgoing = msg()
+    .merge({ description })
+    .grantCaps({
+      send: m => process.stdout.write(frame.format(m)),
+      close: () => outgoing.close(),
+    })
+    .closes(msgs, rl, reader)
 
-  outgoing.closes(msgs, rl, reader)
-
-  rl.on('line', line => reader.send(msg({ scalar: line + '\n' })))
+  rl.on('line', line => reader.send(msg().merge({ scalar: line + '\n' })))
   rl.on('close', () => outgoing.close())
   return [outgoing, recv]
 }
