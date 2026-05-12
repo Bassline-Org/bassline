@@ -1,7 +1,7 @@
 /**
  * @import {Send, Recv} from "@bassline/core"
  */
-import { is, invariants, Msg, propagator, consume } from '@bassline/core'
+import { is, failure, Msg, msg, propagator, consume } from '@bassline/core'
 
 const description = `\
 I am a cache.
@@ -31,12 +31,10 @@ Messages sent to me will be cached and shared.
 I will automatically route incoming messages to their caps.
 I only propagate messages that weren't routed to caps.
 `
-export const assertMsg = invariants([[is.msg, 'expected msg']])
-export const isCommit = invariants([
-  [is.msg, 'expected msg'],
-  [m => m.caps.size === 0, 'has caps, not a commit'],
-  [m => m.has('capabilities'), 'no capability data'],
-])
+export const assertMsg = m => {
+  if (!is.msg(m)) throw failure('expected msg')
+  return m
+}
 
 /**
  *
@@ -59,15 +57,14 @@ export function createCache() {
     const result = dispatch(aMsg)
     if (result) fwd(result)
   })
-  cache.merge({ description })
-
-  const closed = () => cache.ctl.closed
-
-  cache.ctl.onClose(() => {
+  cache.merge({ description }).onClose(() => {
     for (const msg of byMsg.keys()) msg.close()
     byId.clear()
     byMsg.clear()
   })
+  const locals = { onMsg, dispatch, toData, entries }
+
+  return [cache, locals]
 
   /**
    *
@@ -89,39 +86,32 @@ export function createCache() {
    * @returns {Msg | undefined}
    */
   function toData(aMsg) {
-    if (closed()) return
+    if (cache.closed) return
     assertMsg(aMsg)
-    let cached = byMsg.get(aMsg)
-    if (cached) return cached
+    if (byMsg.has(aMsg)) return byMsg.get(aMsg)
 
     const ids = []
     const capabilities = {}
-    cached = new Msg()
-    byMsg.set(aMsg, cached)
-    aMsg.closes(cached)
-
-    for (const spelling of aMsg.caps.keys()) {
+    for (const spelling of aMsg.capKeys) {
       const id = crypto.randomUUID()
       ids.push(id)
       byId.set(id, m => aMsg.invoke(spelling, m))
       capabilities[spelling] = id
     }
+    const description = entryDescription(ids)
 
-    cached.ctl.onClose(() => {
-      byMsg.delete(aMsg)
-      ids.forEach(id => byId.delete(id))
-    })
+    const cached = msg()
+      .merge({ description, capabilities })
+      .closedBy(aMsg)
+      .onClose(() => {
+        byMsg.delete(aMsg)
+        ids.forEach(id => byId.delete(id))
+      })
 
-    cached.merge({
-      description: entryDescription(ids),
-      capabilities,
-    })
+    byMsg.set(aMsg, cached)
 
     return cached
   }
-
-  const locals = { onMsg, dispatch, toData, entries }
-  return [cache, locals]
 }
 
 /**
@@ -135,15 +125,15 @@ export function bindRawCaps(aMsg, delegate) {
   assertMsg(delegate)
   const caps = aMsg.get('capabilities')
   if (!caps) return aMsg
-  return aMsg.map(copy => {
-    aMsg.closes(copy)
-    delegate.closes(copy)
-    copy.delete('capabilities')
-    for (const [spelling, id] of Object.entries(caps)) {
-      copy.grant(spelling, msg => delegate.send(msg.copy({ via: id })))
-    }
-    return copy
-  })
+  const toGrant = Object.fromEntries(
+    Object.entries(caps).map(([s, id]) => [
+      s,
+      m => delegate.send(m.copy({ via: id })),
+    ])
+  )
+  return aMsg.map(copy =>
+    copy.grantCaps(toGrant).delete('capabilities').closedBy(aMsg, delegate)
+  )
 }
 
 export function conversation(delegate, { recv, toData, dispatch }) {
@@ -152,7 +142,7 @@ export function conversation(delegate, { recv, toData, dispatch }) {
     if (r) send(r)
   })
   const conv = new Msg({ description: convDescription })
-  conv.grantAll({
+  conv.grantCaps({
     send: aMsg => {
       const raw = toData(aMsg)
       delegate.send(raw)

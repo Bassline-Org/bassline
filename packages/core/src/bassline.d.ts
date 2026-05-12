@@ -69,7 +69,7 @@ export class Msg<
   pick<K extends keyof D>(key: K): { [P in K]: D[P] }
   pick<const K extends readonly (keyof D)[]>(keys: K):
     { [P in K[number]]: D[P] }
-  
+
   merge<M extends Msg>(m: M): Msg<D & M['data'], C>
   merge<K extends MsgData>(data: K):
     Msg<D & K, C>
@@ -79,7 +79,7 @@ export class Msg<
   delete<K extends keyof D>(key: K): Msg<Omit<D, K>, C>
   delete<const K extends readonly (keyof D)[]>(keys: K):
     Msg<Omit<D, K[number]>, C>
-  
+
   capableOf<K extends string>(key: K):
     this is Msg<D, C & Record<K, AnySend>>
   capableOf<K extends string>(keys: ReadonlyArray<K>):
@@ -88,7 +88,7 @@ export class Msg<
   revokeCaps<K extends keyof C>(key: K): Msg<D, Omit<C, K>>
   revokeCaps<const K extends readonly (keyof C)[]>(keys: K):
     Msg<D, Omit<C, K[number]>>
-  
+
   defaultCaps<K extends MsgCaps>(defaults: K):
     Msg<D, C & Omit<K, keyof C>>
 
@@ -107,6 +107,7 @@ export class Msg<
 }
 
 export function msg(): Msg<{}, {}>
+export function msg<D extends MsgData>(data: D): Msg<D>
 
 export type Recv<M extends Msg = Msg> = () => Promise<M | typeof EOF>
 export type PortLike<C extends MsgCaps = {}>

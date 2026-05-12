@@ -27,16 +27,15 @@ export const is = {
 // [[file:../book/v2.org::*Object Manipulation][Object Manipulation:1]]
 function get(obj, keys) {
   if (is.undefined(obj)) return []
-  else if (is.array(keys)) keys.forEach(k => obj?.[k])
-  else if (is.string(keys)) obj?.[keys]
-  else throw failure('get: keys must be a string or an array of strings')
-  return obj
+  if (is.array(keys)) return keys.forEach(k => obj?.[k])
+  if (is.string(keys)) return obj?.[keys]
+  throw failure('get: keys must be a string or an array of strings')
 }
 
 function has(obj, keys) {
   if (is.undefined(obj)) return false
   if (is.array(keys)) return keys.every(k => has(obj, k))
-  if (is.string(keys)) return Object.hasOwn(this.data, keys)
+  if (is.string(keys)) return Object.hasOwn(obj, keys)
   throw failure('has: keys must be a string or an array of strings')
 }
 
@@ -69,8 +68,11 @@ function pick(obj, keys) {
   if (is.undefined(obj)) return {}
   if (is.array(keys)) {
     return Object.fromEntries(keys.map(k => [k, obj[k]]))
-  } else if (is.string(keys)) return { [keys]: obj[keys] }
-  else throw failure('pick: keys must be a string or an array of strings')
+  } else if (is.string(keys)) {
+    return { [keys]: obj[keys] }
+  } else {
+    throw failure('pick: keys must be a string or an array of strings')
+  }
 }
 // Object Manipulation:1 ends here
 
@@ -122,8 +124,8 @@ export class Controller {
 // Controller:1 ends here
 
 // [[file:../book/v2.org::*Concretely][Concretely:1]]
-export function msg() {
-  return new Msg()
+export function msg(data = {}) {
+  return new Msg().merge(data)
 }
 
 export class Msg extends Controller {
