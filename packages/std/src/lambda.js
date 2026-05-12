@@ -1,10 +1,3 @@
-/**
- * @import { Msg, Send } from "@bassline/core"
- */
-/**
- * @typedef {Msg<unknown, {call: Send<Request>}>} Lambda
- * @typedef {Msg<unknown, {resolve: Send, reject: Send}>} Request
- */
 import { msg, is, failure } from '@bassline/core'
 const description = `\
 I am a lambda.
@@ -23,18 +16,12 @@ Anything else will reject the message.`
 const requiredCaps = ['resolve', 'reject']
 
 export function lambda(fn) {
-  /**
-   * @type {Msg<{description: string}, {call: Send}>}
-   */
-  const message = msg({ description })
-  message.grantAll({ call, close: message.close })
-  /**
-   *
-   * @param {Request} aMsg
-   * @returns {Promise<Msg>}
-   */
+  const lambdaMsg = msg()
+    .merge({ description })
+    .grantCaps({ call, close: () => lambdaMsg.close() })
+
   async function call(aMsg) {
-    if (!aMsg.hasCap(requiredCaps)) return
+    if (!aMsg.capableOf(requiredCaps)) return
     // we do this to copy the resolve & reject caps for santiary reasons
     const responder = aMsg.copy()
     let transferred = false
@@ -46,68 +33,44 @@ export function lambda(fn) {
       if (is.fn(result)) {
         const m = lambda(result)
         m.closes(aMsg)
-        message.closes(m)
+        lambdaMsg.closes(m)
         transferred = true
         return responder.invoke('resolve', m)
       }
       if (is.undefined(result)) {
-        return responder.invoke('resolve', msg({}))
+        return responder.invoke('resolve', msg())
       }
       throw failure(`invalid result: ${JSON.stringify(result)}`)
     } catch (e) {
-      console.error(e)
-      responder.invoke('reject', msg({ error: e.message }))
+      if (e instanceof Error) {
+        return responder.invoke('reject', msg().merge({ error: e.message }))
+      }
+      throw e
     } finally {
       responder.close()
       if (!transferred) aMsg.close()
     }
   }
-  return message
+  return lambdaMsg
 }
 
-/**
- * @param {Msg} aMsg
- * @returns {readonly [Request, Promise<Msg>]}
- */
-export function createPromise(aMsg = msg({})) {
+export function createPromise(aMsg = msg()) {
   const resolver = aMsg
   const promise = new Promise((resolve, reject) => {
-    resolver.grantAll({ resolve, reject })
+    resolver.grantCaps({ resolve, reject })
   })
   return [resolver, promise]
 }
 
-/**
- * @type {<S extends string>(spelling: S) => (target: Msg<unknown, {[key in S]: Send<Request>}>) => (aMsg: Msg) => Promise<Msg>}
- */
 export const request =
   spelling =>
   aTarget =>
   async (aMsg = msg()) => {
-    const [resolver, promise] = createPromise()
+    const [resolver, promise] = createPromise(aMsg.copy())
     const lam = await aTarget
-    lam.invoke(
-      spelling,
-      aMsg.map(m => m.eat(resolver))
-    )
+    lam.invoke(spelling, resolver)
     const result = await promise
     return result
   }
 
 export const call = request('call')
-
-/**
- * @template {Msg} T
- * @param {Lambda | Lambda[]} expr
- * @returns {Promise<T>}
- */
-export async function evaluate(expr) {
-  if (is.msg(expr)) return expr
-  if (!is.array(expr)) throw failure('evalute requires an array / msg for expr')
-  const [head, ...tail] = expr
-  let result = await evaluate(head)
-  for (const m of tail) {
-    result = await call(result)(await evaluate(m))
-  }
-  return result
-}

@@ -29,7 +29,7 @@ describe('smoke', () => {
 })
 
 describe('toData', () => {
-  const [_handle, cache] = createCache()
+  const [handle, cache] = createCache()
   const a = exampleMsg.copy()
   const size = () => cache.entries().length
   it('should reject non-messages', () => {
@@ -98,6 +98,14 @@ describe('toData', () => {
     expect(foo.closed && bar.closed && baz.closed).toBe(true)
     expect(size()).toBe(0)
   })
+
+  it('should return undefined when cache is closed', () => {
+    const before = cache.toData(a)
+    handle.close()
+    const after = cache.toData(a)
+    expect(before).toBeInstanceOf(Msg)
+    expect(after).toBeUndefined()
+  })
 })
 
 describe('bindRawCaps', () => {
@@ -149,5 +157,10 @@ describe('bindRawCaps', () => {
     a.invoke('foo')
     fromParked.invoke('foo')
     expect(foo).toHaveBeenCalledTimes(3)
+  })
+
+  it('should return the same message, if it lacks capability data', () => {
+    const m = bindRawCaps(a, handle)
+    expect(m).toBe(a)
   })
 })
