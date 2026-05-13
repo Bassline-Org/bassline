@@ -1,3 +1,4 @@
+/** @import { Msg } from "@bassline/core" */
 import { msg, is, failure } from '@bassline/core'
 const description = `\
 I am a lambda.
@@ -13,15 +14,15 @@ If the fn returns a msg, it will resolve to the msg.
 If the fn returns undefined, it will resolve an empty message.
 Anything else will reject the message.`
 
-const requiredCaps = ['resolve', 'reject']
-
-export function lambda(fn) {
-  const lambdaMsg = msg()
-    .merge({ description })
-    .grantCaps({ call, close: () => lambdaMsg.close() })
+/**
+@param {(m: Msg) => unknown} fn
+@param {Msg} [target]
+ */
+export function lambda(fn, target = msg()) {
+  return target.defaults({ description }).grantCaps({ call })
 
   async function call(aMsg) {
-    if (!aMsg.capableOf(requiredCaps)) return
+    if (!aMsg.capableOf(['resolve', 'reject'])) return
     // we do this to copy the resolve & reject caps for santiary reasons
     const responder = aMsg.copy()
     let transferred = false
@@ -31,10 +32,8 @@ export function lambda(fn) {
         return responder.invoke('resolve', result)
       }
       if (is.fn(result)) {
-        const m = lambda(result)
-        m.closes(aMsg)
-        lambdaMsg.closes(m)
         transferred = true
+        const m = lambda(result).closedBy(target)
         return responder.invoke('resolve', m)
       }
       if (is.undefined(result)) {
@@ -51,24 +50,20 @@ export function lambda(fn) {
       if (!transferred) aMsg.close()
     }
   }
-  return lambdaMsg
 }
 
-export function createPromise(aMsg = msg()) {
-  const resolver = aMsg
-  const promise = new Promise((resolve, reject) => {
-    resolver.grantCaps({ resolve, reject })
+export function withResolver(aMsg) {
+  return new Promise((resolve, reject) => {
+    aMsg.grantCaps({ resolve, reject })
   })
-  return [resolver, promise]
 }
 
 export const request =
   spelling =>
-  aTarget =>
-  async (aMsg = msg()) => {
-    const [resolver, promise] = createPromise(aMsg.copy())
+  async (aTarget, aMsg = msg()) => {
+    const promise = withResolver(aMsg)
     const lam = await aTarget
-    lam.invoke(spelling, resolver)
+    lam.invoke(spelling, aMsg)
     const result = await promise
     return result
   }

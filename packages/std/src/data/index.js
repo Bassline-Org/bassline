@@ -14,18 +14,43 @@
  * - scalars
  * - collections
  * - intervals
- * - semver
+ * - semver (wip)
  * - uri
- * - capabilities
- * - basic provenance types
  * @todo the uri is just an href for now but this will support both reprs later
  */
+import { is, msg, failure } from '@bassline/core'
 
-export * from './scalar.js'
-export * from './collection.js'
-export * from './interval.js'
-export * from './semver.js'
-export * from './uri.js'
-export * from './caps.js'
-export * from './provenance.js'
-export * from './docs.js'
+//@todo I need to update semver and it's logic
+//export * from './semver.js'
+
+export function scalar(value, aMsg = msg()) {
+  if (!is.scalar(value))
+    throw failure(`scalar: invalid value ${JSON.stringify(value)}`)
+  return aMsg.merge({ scalar: value })
+}
+
+export function uri(href, aMsg = msg()) {
+  if (!URL.canParse(href)) throw failure(`uri: cannot parse href ${href}`)
+  return aMsg.merge({ href })
+}
+
+export function describe(description, aMsg = msg()) {
+  if (!is.string(description))
+    throw failure(`describe: invalid description: ${description}`)
+  return aMsg.merge({ description })
+}
+
+export function interval(min, max, aMsg = msg()) {
+  if (!(is.number(min) && is.number(max)))
+    throw failure(`interval: min ${min} max:${max}`)
+
+  if (min > max) throw failure('interval: min cannot be > max')
+
+  return aMsg.merge({ min, max })
+}
+
+export function collection(items, aMsg = msg()) {
+  if (!is.array(items))
+    throw failure(`collection: items must be an array: ${items}`)
+  return aMsg.merge({ items })
+}

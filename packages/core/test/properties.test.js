@@ -8,7 +8,7 @@ const defined = fc.anything().filter(v => v !== undefined)
 test.prop([fc.dictionary(fc.string(), fc.anything())])(
   'message always returns a message',
   input => {
-    const m = msg().merge(input)
+    const m = msg(input)
     expect(m).toBeInstanceOf(Msg)
   }
 )
@@ -16,22 +16,9 @@ test.prop([fc.dictionary(fc.string(), fc.anything())])(
 test.prop([fc.object()])(
   'message of plain object is a copy, not same reference',
   obj => {
-    const m = msg().merge(obj)
+    const m = msg(obj)
     expect(m.data).toEqual(obj)
     expect(m.data).not.toBe(obj)
-  }
-)
-
-test.prop([fc.object(), fc.integer({ min: 5, max: 20 })])(
-  'message is idempotent',
-  (obj, n) => {
-    const init = msg().merge(obj)
-    let res = msg().merge(init)
-    for (let i = 0; i < n; i++) {
-      res = msg().merge(res)
-    }
-    expect(res.data).toEqual(init.data)
-    expect(res.caps).toEqual(init.caps)
   }
 )
 

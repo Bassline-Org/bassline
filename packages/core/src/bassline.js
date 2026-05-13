@@ -171,9 +171,7 @@ export class Msg extends Controller {
     return this
   }
 
-  // @todo add proper msg polymorphism for the rest
   merge(data) {
-    if (is.msg(data)) return this.merge(data.data)
     merge(this.data, data)
     return this
   }
@@ -219,12 +217,16 @@ export class Msg extends Controller {
     return new Msg().defaults(this.data).defaultCaps(this.caps).merge(data)
   }
 
-  do(fn) {
-    return fn(this)
+  do(fn, ...args) {
+    return fn(this, ...args)
   }
 
-  map(fn) {
-    return fn(this.copy())
+  map(fn, ...args) {
+    return fn(this.copy(), ...args)
+  }
+
+  with(fn, ...args) {
+    return fn(...args, this)
   }
 
   // lifecycle
@@ -256,7 +258,7 @@ export function port(size = Infinity) {
         // add the message to the buffer if we have capacity
         if (size > 0) buffer.push(msg)
       },
-      close: m.close,
+      close: () => m.close(),
     })
     .onClose(() => {
       for (const w of waiters) w(EOF)

@@ -9,22 +9,22 @@ describe('message', () => {
 
   it('copies plain objects', () => {
     const orig = { temperature: 72 }
-    const m = msg().merge(orig)
+    const m = msg(orig)
     expect(m.data).toEqual({ temperature: 72 })
     expect(m.data).not.toBe(orig) // shallow copy, not same reference
   })
 
   it('throw with primitives', () => {
-    expect(() => msg().merge(42)).toThrow('data must be an object')
-    expect(() => msg().merge('hello')).toThrow('data must be an object')
-    expect(() => msg().merge(true)).toThrow('data must be an object')
+    expect(() => msg(42)).toThrow('data must be an object')
+    expect(() => msg('hello')).toThrow('data must be an object')
+    expect(() => msg(true)).toThrow('data must be an object')
   })
 
   it('throws on arrays', () => {
-    expect(() => msg().merge([1, 2, 3])).toThrow('data must be an object')
+    expect(() => msg([1, 2, 3])).toThrow('data must be an object')
   })
 
   it('works on objects', () => {
-    expect(msg().merge({ hello: 'world' }).data).toEqual({ hello: 'world' })
+    expect(msg({ hello: 'world' }).data).toEqual({ hello: 'world' })
   })
 })

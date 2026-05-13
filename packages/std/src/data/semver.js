@@ -1,5 +1,4 @@
-//@ts-check
-import { is, cell, invariants, failure, msg } from '@bassline/core'
+import { is, cell, failure, msg, AssertionFailure } from '@bassline/core'
 /**
 @import { Semver, Ordering } from "./types"
 @import { Send, Msg } from "@bassline/core"
@@ -78,31 +77,33 @@ export function cmpSemver(msgA, msgB) {
 }
 
 // ==== shape predicates ====
-export const assertVersionNum = invariants([
-  [is.number, 'version num must be a number'],
-  [
-    (/** @type {number}*/ n) => Number.isInteger(n),
-    'version num must be an integer',
-  ],
-  [(/** @type {number}*/ n) => n >= 0, 'version num must be >= 0'],
-])
-export const assertSemver = invariants([
-  [
-    /**
-     *
-     * @param {Msg} m
-     * @returns
-     */
-    m =>
-      m.conforms({
-        major: assertVersionNum,
-        minor: assertVersionNum,
-        patch: assertVersionNum,
-      }),
-    'invalid semver',
-  ],
-])
-export const isSemver = assertSemver.test
+/** @param {unknown} n */
+export function assertVersionNum(n) {
+  if (!is.number(n)) throw failure('version num must be a number')
+  if (!Number.isInteger(n)) throw failure('version must be an integer')
+  if (n < 0) throw failure('version num must be >= 0')
+  return n
+}
+
+/** @param {Msg} m */
+export function assertSemver(m) {
+  const { min, max, major } = m.pick(['min', 'max', 'major'])
+  return [min, max, major].every(assertVersionNum)
+}
+
+/**
+@param {Msg} m
+@returns {m is Semver}
+ */
+export function isSemver(m) {
+  try {
+    assertSemver(m)
+    return true
+  } catch (e) {
+    if (e instanceof AssertionFailure) return false
+    throw e
+  }
+}
 
 // ==== cell merges ====
 /**
@@ -118,7 +119,7 @@ export function versionMerge(acc, inc, update) {
 }
 
 /**
- * @param {Msg} init
+ * @param {Semver} init
  */
 export function versioned(init) {
   if (!isSemver(init)) {

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
-import { call, createPromise, lambda } from '../src/lambda.js'
+import { call, lambda, withResolver } from '../src/lambda.js'
+import { scalar } from '../src/data/index.js'
 import { msg, Msg } from '@bassline/core'
 
 describe('smoke', () => {
@@ -12,8 +13,7 @@ describe('smoke', () => {
 describe('behavior', () => {
   it('should be callable', async () => {
     const m = lambda(vi.fn(() => {}))
-    const req = call(m)
-    const res = await req()
+    const res = await call(m, msg())
     expect(res).toBeInstanceOf(Msg)
     expect(res.keys).toEqual([])
     expect(res.capKeys).toEqual([])
@@ -27,11 +27,9 @@ describe('behavior', () => {
   })
 
   it('should compute when handed correct caps', async () => {
-    const fn = vi.fn(() => msg({ scalar: 123 }))
+    const fn = vi.fn(() => scalar(123))
     const l = lambda(fn)
-    const c = call(l)
-
-    const res = await c(msg({ hello: 'world' }))
+    const res = await call(l, msg({ hello: 'world' }))
 
     expect(fn).toHaveBeenCalledTimes(1)
     expect(res).toBeInstanceOf(Msg)
@@ -42,8 +40,7 @@ describe('behavior', () => {
     const l = lambda(() => {
       throw new Error('oops')
     })
-    const c = call(l)
-    const promise = c(msg({ hello: 'world' }))
+    const promise = call(l, msg({ hello: 'world' }))
     await expect(promise).rejects.toThrow(Msg)
     const res = await promise.catch(e => e)
     expect(res).toMatchObject({
@@ -53,12 +50,9 @@ describe('behavior', () => {
     })
   })
 
-  const callLambda = async (aLambda, scalar) =>
-    await call(aLambda)(msg({ scalar }))
-
   it('should throw for non (msg | fn | undefined) returns', async () => {
     const l = lambda(() => 123)
-    const p = callLambda(l)
+    const p = call(l, scalar(123))
     await expect(p).rejects.toThrow(Msg)
     const res = await p.catch(e => e)
     expect(res.get('error')).toMatch('invalid result:')
@@ -69,16 +63,14 @@ describe('behavior', () => {
       expect(aMsg).toBeInstanceOf(Msg)
       expect(aMsg.capableOf('call')).toBe(true)
     }
-    const l = lambda(
-      a => b => msg({ scalar: a.get('scalar') + b.get('scalar') })
-    )
+    const l = lambda(a => b => scalar(a.get('scalar') + b.get('scalar')))
 
-    const a = await callLambda(l, 10)
+    const a = await call(l, scalar(10))
     expectLambda(a)
-    const b = await callLambda(a, 20)
+    const b = await call(a, scalar(20))
     expect(b).toBeInstanceOf(Msg)
     expect(b.get('scalar')).toBe(30)
-    const c = await callLambda(a, 100)
+    const c = await call(a, scalar(100))
     expect(c).toBeInstanceOf(Msg)
     expect(c.get('scalar')).toBe(110)
   })
@@ -86,37 +78,29 @@ describe('behavior', () => {
 
 describe('lifecycle', () => {
   it('should close the request msg after a non-curried call', async () => {
-    const [resolver, promise] = createPromise()
     const l = lambda(() => msg({ ok: true }))
+    const resolver = msg()
+    const p = withResolver(resolver)
     l.invoke('call', resolver)
-    await promise
+    await p
     expect(resolver.closed).toBe(true)
   })
 
   it('should keep the request msg alive after a curried call', async () => {
-    const [resolver, promise] = createPromise()
+    const resolver = msg()
     const l = lambda(_a => _b => msg({}))
+    const p = withResolver(resolver)
     l.invoke('call', resolver)
-    await promise
+    await p
     expect(resolver.closed).toBe(false)
   })
 
   it('should close the curried child when the parent lambda closes', async () => {
     const l = lambda(_a => _b => msg({}))
-    const m = await call(l)(msg({}))
+    const m = await call(l, msg({}))
     expect(m.capableOf('call')).toBe(true)
     expect(m.closed).toBe(false)
     l.close()
     expect(m.closed).toBe(true)
-  })
-
-  it('should close the originating request when the curried child closes', async () => {
-    const [resolver, promise] = createPromise()
-    const l = lambda(_a => _b => msg({}))
-    l.invoke('call', resolver)
-    const m = await promise
-    expect(resolver.closed).toBe(false)
-    m.close()
-    expect(resolver.closed).toBe(true)
   })
 })

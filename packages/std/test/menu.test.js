@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { menu } from '../src/menu.js'
 import { AssertionFailure, msg, Msg, failure } from '@bassline/core'
-import { createPromise, lambda } from '../src/lambda.js'
+import { lambda, withResolver } from '../src/lambda.js'
 
 describe('smoke', () => {
   it('should create a menu', () => {
@@ -24,7 +24,8 @@ describe('creating with functions', () => {
   })
 
   it('should allow "calling" with the verbs', async () => {
-    const [req, promise] = createPromise(msg({ hello: 'world' }))
+    const req = msg({ hello: 'world' })
+    const promise = withResolver(req)
     m.invoke('bar', req)
     await expect(promise).resolves.toBeInstanceOf(Msg)
     const res = await promise

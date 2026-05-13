@@ -46,6 +46,18 @@ export type Send<M extends Msg = Msg> = (msg: M) => void
 type AnySend = (msg: Msg<any, any>) => void
 export type MsgOf<S> = S extends Send<infer M> ? M : Msg
 
+type AnyFn = (...args: any[]) => any
+type With<F extends AnyFn, M extends Msg = Msg> =
+  Parameters<F> extends [...infer A, infer L]
+    ? L extends M
+    ? {args: A, last: L, result: ReturnType<F>}
+    : never
+    : never
+
+export type Impose<T> = T extends (m: Msg, ...args: infer A) => infer R
+  ? {args: A, result: R}
+  : never
+
 type Elements<T> = T[keyof T]
 
 export class Msg<
@@ -70,7 +82,6 @@ export class Msg<
   pick<const K extends readonly (keyof D)[]>(keys: K):
     { [P in K[number]]: D[P] }
 
-  merge<M extends Msg>(m: M): Msg<D & M['data'], C>
   merge<K extends MsgData>(data: K):
     Msg<D & K, C>
   defaults<K extends MsgData>(data: K):
@@ -101,8 +112,10 @@ export class Msg<
   copy<K extends MsgData>(data?: K):
     Msg<D & K, C>
 
-  do<T>(fn: (value: this) => T): T
-  map<T>(fn: (value: this) => T): T
+  do<F>(fn: F, ...args: Impose<F>['args']): Impose<F>['result']
+  map<F>(fn: F, ...args: Impose<F>['args']): Impose<F>['result']
+  with<F extends AnyFn>(fn: F, ...args: With<F, typeof this>['args']):
+    With<F, typeof this>['result']
   child(): Msg
 }
 
