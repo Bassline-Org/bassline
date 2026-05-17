@@ -14,25 +14,42 @@ can build with Bassline.
 
 * What's Included
 
-** A session / transport dialect
+** A wire dialect
 
-Within =cache.js= we export =createCache=, =conversation=, and =dialogue=.
+=wire.js= exports mold & load.
 
-These let us share messages with capabilities over the wire, letting
-us recognize and use remote capabilities and share local capabilities.
+These let us represent messages (possibly nested) and their
+capabilities over the wire, letting us recognize and use remote caps
+as well as share our local caps.
 
-=createCache= is the lowest level construct, and simply offers the raw
-mechanisms for turning data into caps, caps into data, and dispatching for caps.
+=mold(aMsg, mindId)= takes a message and a fn to encode a cap as a data
+value for dispatching. This is used to lower a message with caps into
+raw JSON data (often just a uuid, but it can support whatever), to be sent
+over the wire, or placed into a new message.
 
-=conversation= allows us to build a participant that automatically
-reifies outgoing messages as data, and binds incoming messages. A
-conversation allows for sharing of a cache among multiple
-participants.
+To disambiguate messaages from dictionaries, the form mold normalizes
+into a "load form". A load form is a dictionary with a single key:
+={loadMessage: {data, caps}}=.
 
-=dialogue= is just like a conversation, however it's cache is scoped to
-a single participant. So once that participant closes, the caps are
-revoked and the cache is cleared. Dialogue hides it's cache internally
-and doesn't allow sharing of the same cache.
+=load(aMsg, resolveCap)= does the opposite of mold. It takes a message
+and if it has no caps and it's data is a load form, it will recursively
+traverse and rewrite the nested messages, using resolveId to bind the
+caps on the messages, and unwrap it's data.
+
+** A context system
+
+To make the wire dialect useful, we want a mechanism to park caps
+before going over the wire, as well as dispatching to parked caps.
+
+That's exactly what this exports.
+
+=context= is a factory for the internal pieces.
+
+=conversation= let's us reuse a context when talking with
+something. Letting remote caps work like local caps.
+
+=dialogue= let's us make a context implicit, only it's effectively a
+conversation without sharing.
 
 ** A proper lambda abstraction
 
