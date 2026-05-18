@@ -1,4 +1,6 @@
-/** @import { Msg } from "@bassline/core" */
+/**
+ * @import { Msg, Send, WithCaps } from "@bassline/core"
+ */
 import { msg, is, failure } from '@bassline/core'
 const description = `\
 I am a lambda.
@@ -15,12 +17,20 @@ If the fn returns undefined, it will resolve an empty message.
 Anything else will reject the message.`
 
 /**
-@param {(m: Msg) => unknown} fn
-@param {Msg} [target]
+ * @typedef {WithCaps<{ call: Send }>} LambdaMsg
+ */
+
+/**
+ * Wraps a function as a Msg with a `call` cap. Invoking `call` with a Msg that
+ * carries `resolve`/`reject` caps applies `fn` and routes the result.
+ * @param {(m: Msg) => unknown} fn
+ * @param {Msg} [target]
+ * @returns {LambdaMsg}
  */
 export function lambda(fn, target = msg()) {
   return target.defaults({ description }).grantCaps({ call })
 
+  /** @param {Msg} aMsg */
   async function call(aMsg) {
     if (!aMsg.capableOf(['resolve', 'reject'])) return
     // we do this to copy the resolve & reject caps for santiary reasons
@@ -33,7 +43,9 @@ export function lambda(fn, target = msg()) {
       }
       if (is.fn(result)) {
         transferred = true
-        const m = lambda(result).closedBy(target)
+        const m = lambda(/** @type {(m: Msg) => unknown} */ (result)).closedBy(
+          target
+        )
         return responder.invoke('resolve', m)
       }
       if (is.undefined(result)) {
@@ -52,12 +64,23 @@ export function lambda(fn, target = msg()) {
   }
 }
 
+/**
+ * Grants `resolve` and `reject` caps on aMsg and returns a Promise that
+ * settles when either is invoked.
+ * @param {Msg} aMsg
+ * @returns {Promise<Msg>}
+ */
 export function withResolver(aMsg) {
   return new Promise((resolve, reject) => {
     aMsg.grantCaps({ resolve, reject })
   })
 }
 
+/**
+ * Builds a request helper for a given cap spelling.
+ * @param {string} spelling
+ * @returns {(target: Msg | Promise<Msg>, aMsg?: Msg) => Promise<Msg>}
+ */
 export const request =
   spelling =>
   async (aTarget, aMsg = msg()) => {

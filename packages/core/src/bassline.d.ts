@@ -145,7 +145,7 @@ export function cell<I extends Msg = Msg, State extends Msg = Msg>(
   { value: () => State, to: Fwd<State>}
 ]
 export type MergeFn<I extends Msg, S extends Msg> =
-  (incoming: I, current: S, send: Send<S>) => void
+  (current: S, incoming: I, send: Send<S>) => void
 
 export function consume<I extends Msg = Msg>(recv: Recv<I>):
   [ PortLike, { to: Fwd<I>, promise: Promise<void>} ]

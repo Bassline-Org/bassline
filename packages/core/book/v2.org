@@ -134,7 +134,7 @@ shows one minimal JavaScript realization of that shape.
     promise: v => v instanceof Promise,
     msg: v => v instanceof Msg,
 
-    nil: v => is.null(v) || is.undefined(v) || isNaN(v),
+    nil: v => is.null(v) || is.undefined(v) || is.nan(v),
     scalar: v => is.number(v) || is.string(v) || is.null(v) || is.boolean(v),
     object: v => typeof v === 'object' && !is.null(v) && !is.array(v),
   }
@@ -145,7 +145,7 @@ shows one minimal JavaScript realization of that shape.
 #+BEGIN_SRC js
   function get(obj, keys) {
     if (is.undefined(obj)) return []
-    if (is.array(keys)) return keys.forEach(k => obj?.[k])
+    if (is.array(keys)) return keys.map(k => obj?.[k]).filter(Boolean)
     if (is.string(keys)) return obj?.[keys]
     throw failure('get: keys must be a string or an array of strings')
   }
@@ -681,7 +681,7 @@ setup your propagators to ignore irrelevant information.
 functions, it's probably cleaner since we can do lifecycle stuff.*
 
 #+begin_src js
-  export function propagator(fn = (v, p) => p(v)) {
+  export function propagator(fn = (v, p) => p(v), m = msg()) {
     const description = 'I am a propagator. I am a reactive inference machine.'
     const targets = new Set()
     const propagate = value => targets.forEach(t => t(value))
@@ -690,7 +690,6 @@ functions, it's probably cleaner since we can do lifecycle stuff.*
       return () => dests.forEach(d => targets.delete(d))
     }
 
-    const m = new Msg()
     m.defaults({ description })
       .grantCaps({
         send: val => {
@@ -925,21 +924,17 @@ the socket.
       .merge({ description })
       .grantCaps({
         send: m => socket.write(frame.format(m)),
-        close: outgoing.close
+        close: () => outgoing.close(),
       })
 
     const [reader, onRead] = frame.reader()
     const [msgs, recv] = port()
     onRead(m => msgs.send(m))
 
-    outgoing
-      .closes(reader, msgs)
-      .onClose(() => socket.destroy())
+    outgoing.closes(reader, msgs).onClose(() => socket.destroy())
 
     socket.on('data', chunk =>
-      reader.send(
-        msg().merge({ scalar: chunk.toString() })
-      )
+      reader.send(msg().merge({ scalar: chunk.toString() }))
     )
     socket.on('close', outgoing.close)
     socket.on('end', outgoing.close)

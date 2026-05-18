@@ -14,7 +14,7 @@ export function fromSocket(socket, frame = defaultFrame) {
     .merge({ description })
     .grantCaps({
       send: m => socket.write(frame.format(m)),
-      close: outgoing.close,
+      close: () => outgoing.close(),
     })
 
   const [reader, onRead] = frame.reader()

@@ -1,32 +1,46 @@
-/**
- * @import { Msg, HasCaps } from "@bassline/core"
- */
 import { is } from '@bassline/core'
 
+/**
+ * @template T
+ * @param {(v: T) => boolean} a
+ * @param {(v: T) => boolean} b
+ * @returns {(v: T) => boolean}
+ */
 export const and = (a, b) => value => a(value) && b(value)
+
+/**
+ * @template T
+ * @param {(v: T) => boolean} a
+ * @param {(v: T) => boolean} b
+ * @returns {(v: T) => boolean}
+ */
 export const or = (a, b) => value => a(value) || b(value)
+
+/**
+ * @template T
+ * @param {T} a
+ * @param {T} b
+ * @returns {boolean}
+ */
 export const equal = (a, b) => a === b
+
+/**
+ * @template T
+ * @param {readonly T[]} elems
+ * @param {T} item
+ * @returns {boolean}
+ */
 export const memberOf = (elems, item) => elems.includes(item)
+
+/**
+ * @template T, U
+ * @param {(acc: U, v: T) => U} fn
+ * @param {U} [seed]
+ * @returns {(arr: T[]) => U}
+ */
 export const reducer = (fn, seed) => arr =>
-  is.undefined(seed) ? arr.reduce(fn) : arr.reduce(fn, seed)
-
-/**
- * @type {<S extends string>(spelling: S) =>
- * (a: HasCaps<S>) => (b: Msg) => void}
- */
-const invokeMsg = spelling => a => b => a.invoke(spelling, b)
-
-/**
- *
- * @param {string | (readonly string[])} spelling
- */
-export const invoke = spelling => {
-  if (is.array(spelling)) {
-    return spelling.map(s => {
-      return [s, invokeMsg(s)]
-    })
-  }
-  return invokeMsg(spelling)
-}
-
-export const { resolve, reject } = invoke(['resolve', 'reject'])
+  is.undefined(seed)
+    ? /** @type {U} */ (
+        /** @type {unknown} */ (arr.reduce(/** @type {any} */ (fn)))
+      )
+    : arr.reduce(fn, seed)

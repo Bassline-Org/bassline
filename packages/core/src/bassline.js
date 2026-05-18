@@ -18,7 +18,7 @@ export const is = {
   promise: v => v instanceof Promise,
   msg: v => v instanceof Msg,
 
-  nil: v => is.null(v) || is.undefined(v) || isNaN(v),
+  nil: v => is.null(v) || is.undefined(v) || is.nan(v),
   scalar: v => is.number(v) || is.string(v) || is.null(v) || is.boolean(v),
   object: v => typeof v === 'object' && !is.null(v) && !is.array(v),
 }
@@ -27,7 +27,7 @@ export const is = {
 // [[file:../book/v2.org::*Object Manipulation][Object Manipulation:1]]
 function get(obj, keys) {
   if (is.undefined(obj)) return []
-  if (is.array(keys)) return keys.forEach(k => obj?.[k])
+  if (is.array(keys)) return keys.map(k => obj?.[k]).filter(Boolean)
   if (is.string(keys)) return obj?.[keys]
   throw failure('get: keys must be a string or an array of strings')
 }
@@ -74,6 +74,7 @@ function pick(obj, keys) {
     throw failure('pick: keys must be a string or an array of strings')
   }
 }
+
 // Object Manipulation:1 ends here
 
 // [[file:../book/v2.org::*Assertions][Assertions:1]]
@@ -269,7 +270,7 @@ export function port(size = Infinity) {
 // Port implementation:1 ends here
 
 // [[file:../book/v2.org::*Propagator][Propagator:1]]
-export function propagator(fn = (v, p) => p(v)) {
+export function propagator(fn = (v, p) => p(v), m = msg()) {
   const description = 'I am a propagator. I am a reactive inference machine.'
   const targets = new Set()
   const propagate = value => targets.forEach(t => t(value))
@@ -278,7 +279,6 @@ export function propagator(fn = (v, p) => p(v)) {
     return () => dests.forEach(d => targets.delete(d))
   }
 
-  const m = new Msg()
   m.defaults({ description })
     .grantCaps({
       send: val => {
